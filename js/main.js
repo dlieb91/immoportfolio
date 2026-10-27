@@ -416,15 +416,27 @@ async function verbinden(auswahl, neuAnlegen) {
     /* Der Rat muss zur Ursache passen. Frueher stand hier immer „prüfe
        portfolio.json" – bei einem Netz- oder Dropbox-Fehler schickte das
        auf die falsche Fährte. */
-    const text = e.message || String(e);
-    const rat = /JSON|Unexpected token/i.test(text)
-      ? 'Die Datei <strong>portfolio.json</strong> ist beschädigt. Unter „backups" im selben Ordner liegen die letzten Sicherungen.'
-      : /Dropbox|Netzwerk|fetch|Failed to/i.test(text)
-        ? 'Das sieht nach einem Problem mit Dropbox oder der Verbindung aus. Prüfe, ob du online bist, und versuche es erneut.'
-        : 'Versuche es erneut, oder wähle ein anderes Portfolio.';
-    startFehler('Portfolio konnte nicht geladen werden', `${text}<br><br>${rat}`);
+    const klar = dbx.fehlerKlartext(e);
+    const roh = e.message || String(e);
+    const rat = klar.neuAnmelden ? ''
+      : /JSON|Unexpected token/i.test(roh)
+        ? '<br><br>Die Datei <strong>portfolio.json</strong> ist beschädigt. Unter „backups" liegen die letzten Sicherungen.'
+        : /Dropbox|fetch|Failed to|NetworkError/i.test(roh)
+          ? '<br><br>Das sieht nach einem Problem mit Dropbox oder der Verbindung aus. Prüfe, ob du online bist.'
+          : '<br><br>Versuche es erneut, oder wähle ein anderes Portfolio.';
+
+    startFehler('Portfolio konnte nicht geladen werden', klar.text + rat);
     const box = startBereich();
-    box.append(el('button.btn.btn-primary', { type: 'button', style: 'margin-top:12px', onclick: () => location.reload() }, ['Neu starten']));
+    if (klar.neuAnmelden) {
+      /* Bei einem Zugangsproblem nützt „Neu starten" nichts – es braucht
+         eine frische Anmeldung. Also gleich den Knopf dafür. */
+      box.append(el('button.btn.btn-primary', {
+        type: 'button', style: 'margin-top:12px',
+        onclick: async () => { await dbx.abmelden(); dropboxStarten(); },
+      }, ['Bei Dropbox neu anmelden']));
+    } else {
+      box.append(el('button.btn.btn-primary', { type: 'button', style: 'margin-top:12px', onclick: () => location.reload() }, ['Neu starten']));
+    }
     box.append(el('button.btn', { type: 'button', style: 'margin-top:8px', onclick: () => startAuswahlZeigen(null) }, ['Anderes Portfolio wählen']));
   }
 }

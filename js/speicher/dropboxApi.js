@@ -71,7 +71,13 @@ export async function anmeldungStarten() {
   }
 
   const verifier = verifierErzeugen();
-  sessionStorage.setItem('dropboxVerifier', verifier);
+  /* In IndexedDB, nicht im sessionStorage: Der gehoert einem einzelnen
+     Browser-Tab. Auf iPhone und iPad laeuft der Umweg ueber dropbox.com
+     haeufig durch einen eigenen Kontext – beim Ruecksprung waere der
+     Nachweis dann verschwunden und die Anmeldung scheiterte genau hier.
+     Der sessionStorage bleibt als zweites Standbein. */
+  await kvSet('dropboxVerifier', verifier);
+  try { sessionStorage.setItem('dropboxVerifier', verifier); } catch { /* privates Fenster */ }
 
   const p = new URLSearchParams({
     client_id: appKey,
@@ -101,8 +107,11 @@ export async function anmeldungAbschliessen() {
   const p = new URLSearchParams(location.search);
   const code = p.get('code');
   const fehler = p.get('error_description') || p.get('error');
-  const verifier = sessionStorage.getItem('dropboxVerifier');
-  sessionStorage.removeItem('dropboxVerifier');
+  let verifier = null;
+  try { verifier = sessionStorage.getItem('dropboxVerifier'); } catch { /* egal */ }
+  if (!verifier) verifier = await kvGet('dropboxVerifier');
+  try { sessionStorage.removeItem('dropboxVerifier'); } catch { /* egal */ }
+  await kvDel('dropboxVerifier');
   history.replaceState(null, '', redirectUri() + location.hash);
 
   if (fehler) throw new Error('Dropbox hat die Anmeldung abgelehnt: ' + fehler);
@@ -211,6 +220,45 @@ function kurz(daten) {
  * haengt davon ab, was kurz() daraus gemacht hat, und eine Zeichenkette zu
  * durchsuchen ginge beim naechsten Umbau still kaputt.
  */
+/**
+ * Uebersetzt einen Dropbox-Fehler in einen Satz, mit dem man etwas
+ * anfangen kann – und sagt dazu, ob eine neue Anmeldung noetig ist.
+ *
+ * Der haeufigste Stolperstein ist `missing_scope`: Werden die Rechte im
+ * Reiter „Permissions" erst **nach** der Anmeldung gesetzt, gelten sie fuer
+ * den bereits erteilten Zugang nicht. Dropbox meldet das sachlich korrekt,
+ * aber in einer Form, die niemand ohne Vorwissen deutet.
+ */
+export function fehlerKlartext(e) {
+  const s = String(e?.daten?.error_summary || e?.message || '');
+  const tag = e?.daten?.error?.['.tag'];
+
+  if (s.includes('missing_scope') || tag === 'missing_scope') {
+    const noetig = e?.daten?.error?.required_scope;
+    return {
+      text: 'Dem Dropbox-Zugang fehlt die Berechtigung'
+        + (noetig ? ` „${noetig}"` : '') + '. Setze bei deiner App unter '
+        + '„Permissions" die Rechte files.content.read und files.content.write, '
+        + 'speichere mit „Submit" – und melde dich danach hier neu an. '
+        + 'Nachträglich gesetzte Rechte gelten für einen bereits erteilten Zugang nicht.',
+      neuAnmelden: true,
+    };
+  }
+  if (s.includes('expired_access_token') || s.includes('invalid_access_token')) {
+    return { text: 'Die Dropbox-Anmeldung ist abgelaufen. Bitte neu anmelden.', neuAnmelden: true };
+  }
+  if (e?.status === 401) {
+    return { text: 'Dropbox hat den Zugang abgelehnt. Bitte neu anmelden.', neuAnmelden: true };
+  }
+  if (e?.status === 429 || s.includes('too_many_requests')) {
+    return { text: 'Dropbox bremst gerade zu viele Anfragen aus. Versuche es in einer Minute erneut.', neuAnmelden: false };
+  }
+  if (s.includes('insufficient_space')) {
+    return { text: 'In deiner Dropbox ist kein Platz mehr frei.', neuAnmelden: false };
+  }
+  return { text: e?.message || String(e), neuAnmelden: false };
+}
+
 export function istNichtGefunden(e) {
   if (!(e instanceof DropboxFehler)) return false;
   const f = e.daten?.error;
@@ -232,8 +280,18 @@ export async function datenLaden(pfad) {
       'Dropbox-API-Arg': JSON.stringify({ path: pfad }),
     },
   });
-  if (antwort.status === 409) return null;            // path/not_found
-  if (!antwort.ok) throw new DropboxFehler('Laden fehlgeschlagen', antwort.status, await antwort.text());
+  if (!antwort.ok) {
+    /* Der Fehlerkoerper ist JSON, auch bei den Inhalts-Endpunkten. Ihn als
+       rohen Text durchzureichen hiesse, die eigentliche Auskunft
+       wegzuwerfen – „Laden fehlgeschlagen" half niemandem weiter. */
+    const text = await antwort.text();
+    let daten = null;
+    try { daten = text ? JSON.parse(text) : null; } catch { /* kein JSON */ }
+    const fehler = new DropboxFehler(kurz(daten) || `Dropbox antwortete mit ${antwort.status}`, antwort.status, daten);
+    // 409 ist bei Dropbox der Sammelstatus; „gibt es nicht" ist nur einer der Faelle.
+    if (antwort.status === 409 && istNichtGefunden(fehler)) return null;
+    throw fehler;
+  }
   const kopf = antwort.headers.get('Dropbox-API-Result');
   return { blob: await antwort.blob(), rev: kopf ? JSON.parse(kopf).rev : null };
 }
