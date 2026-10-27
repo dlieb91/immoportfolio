@@ -74,15 +74,34 @@ Der Server nennt dann die Adressen, unter denen er im Heimnetz erreichbar ist.
 Das ist **unverschlüsselt und ohne Anmeldung** – zum Ausprobieren gedacht, nicht
 für den Dauerbetrieb und auf keinen Fall fürs Internet.
 
-Für den richtigen Betrieb gehören die Dateien auf einen Webspeicher mit HTTPS
-(etwa Cloudflare Pages oder GitHub Pages, beides kostenlos). HTTPS ist keine
-Förmlichkeit: Ohne sicheren Kontext gibt es weder Offline-Betrieb noch den
-Dropbox-Abgleich – der Browser gibt `crypto.subtle` und Service Worker nur im
-sicheren Kontext frei.
+Für den richtigen Betrieb liegen die Dateien auf GitHub Pages:
 
-Danach auf dem iPad in Safari öffnen und über *Teilen → Zum Home-Bildschirm*
-ablegen. Erst damit ist der Speicher dauerhaft (siehe oben) und die App startet
-im Vollbild.
+> **https://dlieb91.github.io/immoportfolio/**
+
+HTTPS ist dabei keine Förmlichkeit: Ohne sicheren Kontext gibt es weder
+Offline-Betrieb noch den Dropbox-Abgleich – der Browser gibt `crypto.subtle` und
+Service Worker nur dort frei.
+
+Auf dem iPad diese Adresse in Safari öffnen und über *Teilen → Zum
+Home-Bildschirm* ablegen. Erst damit ist der Speicher dauerhaft (siehe oben) und
+die App startet im Vollbild.
+
+### Eine neue Fassung veröffentlichen
+
+```
+git add -A
+git commit -m "Was sich geändert hat"
+git push
+```
+
+GitHub Pages baut danach selbsttätig, meist binnen einer Minute. Die App holt
+sich die neuen Dateien beim nächsten Start – der Service Worker fragt immer
+zuerst das Netz und greift nur ohne Verbindung auf seinen Vorrat zurück.
+
+**Was nicht ins Repository gehört** und durch `.gitignore` gesperrt ist: deine
+`portfolio.json`, Bilder, Dokumente, Sicherungen und die lokalen
+Claude-Einstellungen. Das Repository ist öffentlich; der Code enthält keine
+Geheimnisse, denn die Dropbox-Anmeldung über PKCE kommt ohne App-Secret aus.
 
 ### Bedienung mit dem Finger
 
@@ -118,8 +137,14 @@ weiter, waagerechtes Wischen gehört dem Diagramm.
 2. Reiter *Permissions*: `files.content.read` und `files.content.write` ankreuzen
    und speichern. **Vor** dem nächsten Schritt – nachträglich geänderte Rechte
    greifen erst nach einer neuen Anmeldung.
-3. Reiter *Settings*: den **App key** kopieren und bei *Redirect URIs* die Adresse
-   eintragen, die die App dir im Einrichtungsdialog anzeigt.
+3. Reiter *Settings*: den **App key** kopieren und bei *Redirect URIs* genau diese
+   Adresse eintragen (auf das Zeichen genau, mit Schrägstrich am Ende):
+
+   ```
+   https://dlieb91.github.io/immoportfolio/
+   ```
+
+   Die App zeigt dieselbe Adresse im Einrichtungsdialog zum Kopieren an.
 4. In der App „Mit Dropbox verbinden", App key einfügen, anmelden.
 
 Der App key ist nicht geheim – er benennt nur die App. Die Anmeldung läuft über
