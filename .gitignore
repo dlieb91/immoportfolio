@@ -1,0 +1,26 @@
+# Lokale Claude-Einstellungen – enthalten Pfade und Benutzernamen dieses
+# Rechners und gehören niemandem außer diesem Rechner.
+.claude/
+
+# Prüfdateien, die beim Testen im Projektordner entstehen
+pruef-*
+*.pruef.*
+
+# Portfolio-Daten gehören NICHT ins Repository. Sie liegen im Ordner, den
+# du beim ersten Start wählst – normalerweise unter Dokumente.
+portfolio.json
+backups/
+dokumente/
+bilder/objekt-*
+bilder/thumbs/
+
+# Betriebssystem und Editoren
+Thumbs.db
+desktop.ini
+.DS_Store
+*.swp
+.vscode/
+.idea/
+
+# Node
+node_modules/

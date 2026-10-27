@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 500" font-family="Georgia, 'Times New Roman', serif">
+  <defs>
+    <!-- Schattierung der Windrosen-Facetten: Licht- und Schattenseite -->
+    <linearGradient id="faceLight" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3A4F78"/>
+      <stop offset="100%" stop-color="#1B2B4A"/>
+    </linearGradient>
+    <linearGradient id="faceShadow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#14213D"/>
+      <stop offset="100%" stop-color="#0A1226"/>
+    </linearGradient>
+    <linearGradient id="faceLightGold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#E4C567"/>
+      <stop offset="100%" stop-color="#B98F1E"/>
+    </linearGradient>
+
+    <!-- Nadel: warm und hell, damit sie sich vom kühlen Hintergrund abhebt -->
+    <linearGradient id="arrowGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F0D98C"/>
+      <stop offset="55%" stop-color="#C9A227"/>
+      <stop offset="100%" stop-color="#9C7A15"/>
+    </linearGradient>
+
+    <filter id="dropShadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="10" stdDeviation="10" flood-color="#14213D" flood-opacity="0.35"/>
+    </filter>
+    <filter id="softShadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="#000000" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+
+  <rect width="900" height="500" fill="#F7F5F0"/>
+
+  <g transform="translate(450,195)">
+
+    <ellipse cx="0" cy="108" rx="100" ry="14" fill="#14213D" opacity="0.12"/>
+
+    <!-- ============ Windrose ============ -->
+    <g filter="url(#softShadow)">
+      <circle cx="0" cy="0" r="118" fill="#EDEAE1"/>
+      <circle cx="0" cy="0" r="118" fill="none" stroke="#14213D" stroke-width="2" stroke-opacity="0.5"/>
+
+      <!-- Zwischenrichtungen (NO/SO/SW/NW), je zwei Facetten -->
+      <g opacity="0.8">
+        <polygon points="0,0 58,-58 8,-8"  fill="url(#faceLightGold)"/>
+        <polygon points="0,0 58,-58 -8,-8" fill="#8F6E17"/>
+
+        <polygon points="0,0 58,58 8,8"   fill="#8F6E17"/>
+        <polygon points="0,0 58,58 -8,8"  fill="url(#faceLightGold)"/>
+
+        <polygon points="0,0 -58,58 -8,8" fill="url(#faceLightGold)"/>
+        <polygon points="0,0 -58,58 8,8"  fill="#8F6E17"/>
+
+        <polygon points="0,0 -58,-58 -8,-8" fill="#8F6E17"/>
+        <polygon points="0,0 -58,-58 8,-8"  fill="url(#faceLightGold)"/>
+      </g>
+
+      <!-- Hauptrichtungen (N/O/S/W), je zwei Facetten -->
+      <polygon points="0,-98 12,-10 0,0" fill="url(#faceLight)"/>
+      <polygon points="0,-98 -12,-10 0,0" fill="url(#faceShadow)"/>
+
+      <polygon points="98,0 10,12 0,0" fill="url(#faceLight)"/>
+      <polygon points="98,0 10,-12 0,0" fill="url(#faceShadow)"/>
+
+      <polygon points="0,98 -12,10 0,0" fill="url(#faceLight)"/>
+      <polygon points="0,98 12,10 0,0" fill="url(#faceShadow)"/>
+
+      <polygon points="-98,0 -10,-12 0,0" fill="url(#faceLight)"/>
+      <polygon points="-98,0 -10,12 0,0" fill="url(#faceShadow)"/>
+
+      <circle cx="0" cy="0" r="10" fill="#1B2B4A"/>
+      <circle cx="-3" cy="-3" r="4" fill="#4A5F8C"/>
+    </g>
+
+    <text x="0" y="-104" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="15" fill="#14213D" font-weight="bold" opacity="0.75">N</text>
+    <text x="104" y="5" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#14213D" opacity="0.6">O</text>
+    <text x="0" y="118" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#14213D" opacity="0.6">S</text>
+    <text x="-104" y="5" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#14213D" opacity="0.6">W</text>
+
+    <!-- ============ Nadel, zeigt nach NNO ============ -->
+    <g transform="rotate(22.5)" filter="url(#dropShadow)">
+      <polygon points="0,-118 13,-14 0,-4 -13,-14" fill="url(#arrowGrad)" stroke="#7A5E10" stroke-width="1"/>
+      <polygon points="0,52 10,-4 0,-14 -10,-4" fill="#F7F5F0" stroke="#14213D" stroke-width="2.5"/>
+    </g>
+  </g>
+
+  <text x="450" y="378" text-anchor="middle" font-size="56" fill="#14213D" letter-spacing="1">Zahlenkompass</text>
+
+  <text x="450" y="414" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="18" fill="#C9A227" letter-spacing="3">KLARHEIT&#160;&#160;FÜR&#160;&#160;DEINE&#160;&#160;ZAHLEN</text>
+</svg>

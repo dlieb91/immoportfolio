@@ -1,0 +1,6 @@
+{
+  "name": "immoportfolio-mappe",
+  "private": true,
+  "type": "module",
+  "description": "Erzeugt die Excel-/Google-Sheets-Fassung von ImmoPortfolio. Eigenstaendig - greift nicht auf ../js zu."
+}
