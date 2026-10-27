@@ -294,7 +294,12 @@ async function lokalStarten() {
  */
 export async function appKeyAbfragen() {
   const uri = dbx.redirectUri();
-  const input = el('input', { type: 'text', value: (await dbx.appKeyLesen()) || '', placeholder: 'z. B. a1b2c3d4e5f6g7h' });
+  const input = el('input', {
+    type: 'text', value: (await dbx.appKeyLesen()) || '',
+    placeholder: 'z. B. a1b2c3d4e5f6g7h',
+    autocapitalize: 'off', autocorrect: 'off', spellcheck: 'false',
+  });
+  const meldung = el('div.hint', { style: 'color:var(--neg)' });
   const inhalt = el('div', { style: 'display:grid;gap:12px' }, [
     hinweis('<strong>Einmalige Einrichtung bei Dropbox.</strong> Lege auf '
       + '<em>dropbox.com/developers/apps</em> eine App an: <em>Scoped access</em>, '
@@ -304,21 +309,39 @@ export async function appKeyAbfragen() {
       el('label', { text: 'Redirect-URI – im Reiter „Settings" unter „Redirect URIs" eintragen' }),
       el('div.readonly', { text: uri, style: 'user-select:all;word-break:break-all' }),
     ]),
-    el('div.field', {}, [el('label', { text: 'App key' }), input]),
-    el('div.hint', { text: 'Der App key ist nicht geheim – er benennt nur die App. '
-      + 'Dein Zugang entsteht erst bei der Anmeldung und bleibt auf diesem Gerät.' }),
+    el('div.field', {}, [
+      el('label', { text: 'App key – Reiter „Settings", Feld „App key"' }),
+      input,
+      el('div.hint', { text: 'Nicht das darunterstehende „App secret" – das wird hier nicht '
+        + 'gebraucht. Der App key ist nicht geheim, er benennt nur die App. Dein Zugang '
+        + 'entsteht erst bei der Anmeldung und bleibt auf diesem Gerät.' }),
+    ]),
+    meldung,
   ]);
 
-  const wert = await modal({
-    titel: 'Dropbox einrichten', inhalt, breite: 560,
-    buttons: [
-      { text: 'Abbrechen', wert: null },
-      { text: 'Weiter zur Anmeldung', klasse: 'btn-primary', wert: '\0' },
-    ],
-  });
-  if (wert !== '\0' || !input.value.trim()) return false;
-  await dbx.appKeySetzen(input.value);
-  return true;
+  for (;;) {
+    const wert = await modal({
+      titel: 'Dropbox einrichten', inhalt, breite: 560,
+      buttons: [
+        { text: 'Abbrechen', wert: null },
+        { text: 'Weiter zur Anmeldung', klasse: 'btn-primary', wert: '\0' },
+      ],
+    });
+    if (wert !== '\0') return false;
+
+    const key = input.value.trim();
+    /* Dropbox-App-Keys bestehen aus Buchstaben und Ziffern. Ein Leerzeichen
+       oder ein mitkopiertes „App key:" faellt hier auf – sonst erst drueben
+       mit „invalid client_id", und dann weiss niemand, woran es lag. */
+    const fehler = !key ? 'Bitte den App key eintragen.'
+      : /\s/.test(key) ? 'Der App key enthält ein Leerzeichen. Bitte nur die Zeichenfolge selbst einfügen.'
+      : !/^[A-Za-z0-9]+$/.test(key) ? 'Der App key besteht nur aus Buchstaben und Ziffern – hier stehen andere Zeichen.'
+      : null;
+    if (fehler) { meldung.textContent = fehler; continue; }
+
+    await dbx.appKeySetzen(key);
+    return true;
+  }
 }
 
 async function dropboxStarten() {
@@ -333,13 +356,15 @@ async function dropboxStarten() {
     return;
   }
 
-  if (!(await dbx.appKeyLesen())) {
-    if (!(await appKeyAbfragen())) return;
-  }
   if (await dbx.angemeldet()) {
     await verbinden({ kennung: 'dropbox', ziel: { kennung: 'dropbox' }, name: 'Dropbox' }, false);
     return;
   }
+  /* Solange nicht angemeldet ist, wird der App key jedes Mal gezeigt –
+     vorausgefuellt und aenderbar. Erschiene er nur beim ersten Mal, saesse
+     man mit einem Tippfehler fest: Dropbox lehnt mit „invalid client_id"
+     ab, und die App haette keinen Weg, den Wert zu korrigieren. */
+  if (!(await appKeyAbfragen())) return;
   try {
     await dbx.anmeldungStarten();      // verlaesst die Seite
   } catch (e) {
