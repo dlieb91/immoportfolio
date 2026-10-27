@@ -195,9 +195,29 @@ async function rpc(pfad, argument) {
   return daten;
 }
 
+/* error_summary zuerst: Dropbox schreibt dort den vollstaendigen Pfad des
+   Fehlers hin („path/not_found/."), waehrend error['.tag'] nur die erste
+   Stufe nennt („path"). Umgekehrt ginge die eigentliche Auskunft verloren. */
 function kurz(daten) {
+  if (daten?.error_summary) return `Dropbox: ${daten.error_summary}`;
   const t = daten?.error?.['.tag'];
-  return t ? `Dropbox: ${t}` : daten?.error_summary || null;
+  return t ? `Dropbox: ${t}` : null;
+}
+
+/**
+ * Meldet dieser Fehler „gibt es nicht"?
+ *
+ * Wird an der verschachtelten Antwort geprueft und nicht am Text: Der Text
+ * haengt davon ab, was kurz() daraus gemacht hat, und eine Zeichenkette zu
+ * durchsuchen ginge beim naechsten Umbau still kaputt.
+ */
+export function istNichtGefunden(e) {
+  if (!(e instanceof DropboxFehler)) return false;
+  const f = e.daten?.error;
+  if (f?.path?.['.tag'] === 'not_found') return true;          // files/download
+  if (f?.['.tag'] === 'path' && f.path?.['.tag'] === 'not_found') return true;
+  if (f?.path_lookup?.['.tag'] === 'not_found') return true;   // files/delete_v2
+  return String(e.daten?.error_summary || '').includes('not_found');
 }
 
 /**
@@ -258,19 +278,24 @@ export async function loeschen(pfad) {
   try {
     await rpc('files/delete_v2', { path: pfad });
   } catch (e) {
-    /* Schon weg ist auch recht. */
-    if (!String(e.message).includes('path_lookup') && !String(e.message).includes('not_found')) throw e;
+    if (!istNichtGefunden(e)) throw e;      // schon weg ist auch recht
   }
 }
 
-/** Alle Dateien unter einem Ordner, rekursiv. Leerer Ordner ist kein Fehler. */
+/**
+ * Alle Dateien unter einem Ordner, rekursiv.
+ *
+ * Ein fehlender Ordner ist **kein** Fehler: Beim ersten Verbinden ist der
+ * Dropbox-App-Ordner leer, `bilder/` und `dokumente/` gibt es noch gar
+ * nicht. Das als Fehler zu behandeln liesse den ersten Abgleich scheitern.
+ */
 export async function auflisten(ordner) {
   const treffer = [];
   let antwort;
   try {
     antwort = await rpc('files/list_folder', { path: ordner, recursive: true });
   } catch (e) {
-    if (String(e.message).includes('not_found')) return treffer;
+    if (istNichtGefunden(e)) return treffer;
     throw e;
   }
   for (;;) {

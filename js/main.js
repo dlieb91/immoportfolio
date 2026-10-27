@@ -413,8 +413,19 @@ async function verbinden(auswahl, neuAnlegen) {
     appStarten();
   } catch (e) {
     console.error(e);
-    startFehler('Portfolio konnte nicht geladen werden', (e.message || String(e)) + '<br><br>Prüfe, ob die Datei portfolio.json gültig ist.');
-    startBereich().append(el('button.btn', { type: 'button', style: 'margin-top:12px', onclick: () => location.reload() }, ['Neu starten']));
+    /* Der Rat muss zur Ursache passen. Frueher stand hier immer „prüfe
+       portfolio.json" – bei einem Netz- oder Dropbox-Fehler schickte das
+       auf die falsche Fährte. */
+    const text = e.message || String(e);
+    const rat = /JSON|Unexpected token/i.test(text)
+      ? 'Die Datei <strong>portfolio.json</strong> ist beschädigt. Unter „backups" im selben Ordner liegen die letzten Sicherungen.'
+      : /Dropbox|Netzwerk|fetch|Failed to/i.test(text)
+        ? 'Das sieht nach einem Problem mit Dropbox oder der Verbindung aus. Prüfe, ob du online bist, und versuche es erneut.'
+        : 'Versuche es erneut, oder wähle ein anderes Portfolio.';
+    startFehler('Portfolio konnte nicht geladen werden', `${text}<br><br>${rat}`);
+    const box = startBereich();
+    box.append(el('button.btn.btn-primary', { type: 'button', style: 'margin-top:12px', onclick: () => location.reload() }, ['Neu starten']));
+    box.append(el('button.btn', { type: 'button', style: 'margin-top:8px', onclick: () => startAuswahlZeigen(null) }, ['Anderes Portfolio wählen']));
   }
 }
 

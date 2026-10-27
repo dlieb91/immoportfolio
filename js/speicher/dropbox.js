@@ -253,7 +253,23 @@ async function dateienHochladen() {
   }
 }
 
+/**
+ * Bilder und Dokumente abgleichen.
+ *
+ * Schlaegt das fehl, ist das aergerlich, aber kein Grund, den ganzen
+ * Abgleich zu verwerfen – die Zahlen stehen in der portfolio.json und sind
+ * an dieser Stelle laengst uebertragen. Der Fehler landet in der Konsole,
+ * der naechste Lauf versucht es erneut.
+ */
 async function dateienAbgleichen() {
+  try {
+    await dateienAbgleichenRoh();
+  } catch (e) {
+    console.warn('Bilder und Dokumente konnten nicht abgeglichen werden:', e);
+  }
+}
+
+async function dateienAbgleichenRoh() {
   const fern = new Map();
   for (const ordner of ORDNER) {
     for (const e of await api.auflisten('/' + ordner)) fern.set(e.pfad.toLowerCase(), e);
