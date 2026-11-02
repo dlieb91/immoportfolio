@@ -360,6 +360,10 @@ function stammdaten(o, inner, allesNeu) {
       textFeld('Ort', o, 'ort', { nach: kopfNeu }),
       auswahlFeld('Bundesland', o, 'bundesland', laender, { hint: 'bestimmt die Grunderwerbsteuer', nach: kopfNeu }),
       zahlFeld('Baujahr', o, 'baujahr', { nachkomma: 0, nach: kopfNeu }),
+      zahlFeld('Kappungsgrenze, abweichend', o, 'kappungsgrenzeAbweichend', {
+        suffix: '%', nachkomma: 0, nach: kopfNeu,
+        hint: `leer = Portfolio-Vorgabe (${num(state.daten.einstellungen.kappungsgrenzeProzent ?? 20, 0)} %) · 15 % gelten nur in Gebieten mit angespanntem Wohnungsmarkt`,
+      }),
       zahlFeld('Wohn-/Nutzfläche', o, 'flaeche', { suffix: 'm²', nachkomma: 2, hint: o.mehrereEinheiten ? 'wird bei erfassten Einheiten überschrieben' : '' }),
       zahlFeld('Zimmer', o, 'zimmer', { nachkomma: 1 }),
     ]),

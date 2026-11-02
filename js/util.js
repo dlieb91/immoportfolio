@@ -43,9 +43,18 @@ export function heuteISO() {
 }
 
 /** Lokales Datum, um Tage bzw. Jahre verschoben – fuer Fristen und Stichtage. */
-export function datumPlus({ tage = 0, jahre = 0 } = {}, ab = new Date()) {
+export function datumPlus({ tage = 0, monate = 0, jahre = 0 } = {}, ab = new Date()) {
   const d = new Date(ab.getFullYear(), ab.getMonth(), ab.getDate());
   if (jahre) d.setFullYear(d.getFullYear() + jahre);
+  /* setMonth laesst den 31. in einem kuerzeren Monat ueberlaufen (31.01. plus
+     einen Monat waere der 03.03.). Fuer Mietfristen zaehlt der Monatsletzte,
+     also wird zurueckgesetzt. */
+  if (monate) {
+    const tag = d.getDate();
+    d.setDate(1);
+    d.setMonth(d.getMonth() + monate);
+    d.setDate(Math.min(tag, new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()));
+  }
   if (tage) d.setDate(d.getDate() + tage);
   return datumISO(d);
 }

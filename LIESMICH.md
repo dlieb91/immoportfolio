@@ -208,6 +208,7 @@ werden bewusst nicht verglichen; die laufen auf zwei Geräten ohnehin auseinande
 | 11 | Dropbox-Abgleich mit Offline-Betrieb | fertig |
 | 12 | Touch-Bedienung fürs iPad | fertig |
 | 13 | Spekulationsfrist, offene § 82b-Verteilungen, Soll/Ist bei den Mieten | fertig |
+| 14 | Mieterhöhungsspielraum nach § 558 BGB | fertig |
 
 ## Aufbau des Codes
 
@@ -227,6 +228,7 @@ js/speicher/lokal.js        Ablage auf dem Gerät (IndexedDB)
 js/speicher/dropbox.js      Ablage Dropbox: lokal zuerst, Abgleich daneben
 js/speicher/dropboxApi.js   Dropbox-Anmeldung (PKCE) und REST-Aufrufe
 js/abgleich.js       wann abgeglichen wird, Konfliktdialog, Statusanzeige
+js/mieterhoehung.js  Spielraum nach § 558 BGB (rein, ohne Oberfläche)
 js/store.js          Datenmodell, Zustand, Berechnungen
 js/finanzmathematik.js  Tilgungsrechnung (rein, ohne Oberfläche)
 js/kennzahlen.js     Cashflow, Renditen, Steuern (rein, ohne Oberfläche)
@@ -457,6 +459,30 @@ der Gliederung der Anlage V – je Objekt und fürs ganze Portfolio, exportierba
   Frist eine Orientierung und kein Freibrief.
 - **Ein Verkauf vor Ablauf einer § 82b-Verteilung** lässt den Restbetrag in einer Summe
   abziehbar werden. Die App kennt keinen Verkaufsvorgang und rechnet das nicht.
+
+**Mieterhöhung.** Jeder Mietvertrag zeigt den Spielraum bis zur ortsüblichen
+Vergleichsmiete nach § 558 BGB. Drei Schranken gelten gleichzeitig:
+
+- **Sperrfrist.** Das Erhöhungsverlangen ist frühestens ein Jahr nach der letzten Erhöhung
+  zulässig, wirksam wird die neue Miete erst, wenn die bisherige **15 Monate** unverändert
+  galt. Das sind zwei verschiedene Zeitpunkte, und die Karte nennt beide.
+- **Kappungsgrenze.** Höchstens 20 % in drei Jahren, in Gebieten mit angespanntem
+  Wohnungsmarkt 15 %. Welche gilt, sagt die Verordnung deines Landes – die Vorgabe steht in
+  den Annahmen, abweichend trägst du sie am Objekt ein. Bezugspunkt ist die Miete **drei
+  Jahre vor dem Wirksamwerden**, nicht die heutige.
+- **Ortsübliche Vergleichsmiete.** Die absolute Obergrenze. Sie steht in keinem Datensatz
+  dieser App, sondern im Mietspiegel deiner Gemeinde; eingetragen wird sie je Wohnung in
+  €/m². **Ohne diesen Wert kennt die Rechnung nur die Kappungsgrenze** und sagt das auch –
+  die Zahl taugt dann nicht als Forderung.
+
+Bei **Staffel- und Indexmiete** entfällt das: Dort ist § 558 ausgeschlossen (§ 557a Abs. 2,
+§ 557b Abs. 2 BGB), die Miete folgt der Vereinbarung. Das Dashboard meldet Verträge mit
+Spielraum erst, wenn die Sperrfrist in den nächsten drei Monaten abläuft – vorher ließe sich
+ohnehin nichts durchsetzen.
+
+**Eine Abschätzung, kein Erhöhungsschreiben.** Form und Begründung des Verlangens regelt
+§ 558a BGB, Modernisierungen § 559 BGB, die Mietpreisbremse bei Neuvermietung § 556d BGB –
+nichts davon rechnet die App.
 
 **Zahlungseingang.** Abgeleitete Mieten und Nebenkosten gelten zunächst als geflossen – so
 war es immer, und solange du nichts abhakst, ändert sich nichts. Über den Knopf in der

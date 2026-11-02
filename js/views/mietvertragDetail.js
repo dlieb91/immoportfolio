@@ -11,6 +11,8 @@ import {
   felderGitter, abschnitt, parseZahl, tabellenDatum, tabellenZahl, tabellenText,
 } from '../felder.js';
 import { STATUS_TEXT, STATUS_KLASSE, tageBisEnde } from './mietvertraege.js';
+import { mieterhoehungsPotenzial } from '../mieterhoehung.js';
+import { hinweis } from '../felder.js';
 import { dokumenteKarte, protokollKarte, dokumenteEntfernenFuer } from './dokumente.js';
 
 export const mietvertragDetail = {
@@ -50,6 +52,7 @@ export const mietvertragDetail = {
     // ein- und ausblenden, bauen die Karte neu auf.
     inner.append(neuZeichnend((z) => laufzeit(mv, obenNeu, () => { z(); obenNeu(); })));
     inner.append(neuZeichnend((z) => konditionen(mv, () => { z(); obenNeu(); }, obenNeu)));
+    inner.append(neuZeichnend((z) => mieterhoehungKarte(mv, () => { z(); obenNeu(); })));
     inner.append(neuZeichnend((z) => dokumenteKarte('mietvertrag', mv.id, z)));
     inner.append(abschnitt('Notizen', null, textBereich(null, mv, 'notizen', {
       zeilen: 4, platzhalter: 'Kaution hinterlegt bei …, Übergabeprotokoll, Besonderheiten',
@@ -289,4 +292,92 @@ async function loeschen(mv) {
   });
   toast('Mietvertrag gelöscht', 'ok');
   location.hash = '#/mietvertraege';
+}
+
+/* ---------- Mieterhöhung (§ 558 BGB) ---------- */
+
+/**
+ * Zeigt den Spielraum bis zur ortsüblichen Vergleichsmiete.
+ *
+ * Bewusst eine Abschätzung und kein Erhöhungsschreiben: Form und Begründung
+ * des Verlangens regelt § 558a, Modernisierungsumlagen § 559 – beides steht
+ * hier nicht zur Debatte. Der Hinweis am Fuß sagt das.
+ */
+function mieterhoehungKarte(mv, neu) {
+  const p = mieterhoehungsPotenzial(mv);
+  const e = einheitMit(mv.einheitId);
+  const heute = heuteISO();
+
+  const zeile = (label, wert, sub, stark) => el('div', {
+    style: 'display:flex;justify-content:space-between;gap:12px;align-items:baseline;padding:7px 0',
+  }, [
+    el('div', {}, [
+      el('div', { text: label }),
+      sub ? el('div.faint', { text: sub, style: 'font-size:12px;margin-top:1px' }) : null,
+    ]),
+    el('span.num', { text: wert, style: stark ? 'font-weight:600' : '' }),
+  ]);
+
+  const inhalt = [];
+
+  /* Das Mietspiegelfeld steht immer da – ohne den Wert bleibt die Obergrenze
+     offen, und das ist die wichtigste Information der ganzen Karte. */
+  if (e) {
+    inhalt.push(felderGitter([
+      zahlFeld('Ortsübliche Vergleichsmiete', e, 'vergleichsmieteQm', {
+        suffix: '€/m²', nachkomma: 2, nach: neu,
+        hint: 'aus dem Mietspiegel deiner Gemeinde · ohne diesen Wert kennt die Rechnung nur die Kappungsgrenze',
+      }),
+    ]));
+  }
+
+  if (!p.moeglich && p.grund) {
+    inhalt.push(el('div.hint', { style: 'padding:8px 0', text: p.grund }));
+  }
+
+  if (p.letzteAenderung) {
+    const gesperrt = heute < p.wirksamAb;
+    inhalt.push(el('div', { style: 'border-top:1px solid var(--border);margin-top:4px;padding-top:4px' }, [
+      zeile('Aktuelle Kaltmiete', eur(p.aktuell),
+        p.flaeche ? `${num(p.aktuell / p.flaeche, 2)} €/m² · ${num(p.flaeche, 0)} m²` : null),
+      zeile('Letzte Mietänderung', datum(p.letzteAenderung)),
+      zeile('Erhöhung verlangen ab', datum(p.verlangenAb), 'frühestens ein Jahr danach (§ 558 Abs. 1 S. 2)'),
+      zeile('Wirksam frühestens ab', datum(p.wirksamAb),
+        gesperrt ? 'die Miete muss 15 Monate unverändert sein' : 'Sperrfrist abgelaufen', true),
+    ]));
+  }
+
+  if (p.grenzeKappung != null) {
+    inhalt.push(el('div', { style: 'border-top:1px solid var(--border);margin-top:4px;padding-top:4px' }, [
+      zeile(`Kappungsgrenze ${num(p.kappungsgrenze, 0)} %`, eur(p.grenzeKappung),
+        `auf ${eur(p.basisDreiJahre)} drei Jahre vor Wirksamwerden`),
+      p.grenzeVergleich != null
+        ? zeile('Ortsübliche Vergleichsmiete', eur(p.grenzeVergleich),
+            `${num(p.flaeche, 0)} m² × ${num(p.vergleichsmieteQm, 2)} €/m²`)
+        : el('div.hint', { style: 'padding:7px 0', text:
+            'Ohne Mietspiegelwert ist die Obergrenze offen – der Betrag unten ist nur die '
+            + 'Kappungsgrenze und taugt nicht als Forderung.' }),
+    ]));
+  }
+
+  if (p.moeglich) {
+    inhalt.push(el('div', { style: 'border-top:1px solid var(--border);margin-top:4px;padding-top:10px' }, [
+      zeile('Mögliche neue Kaltmiete', eur(p.neueMiete),
+        p.begrenztDurch === 'vergleichsmiete' ? 'begrenzt durch die Vergleichsmiete' : 'begrenzt durch die Kappungsgrenze',
+        true),
+      el('div', { style: 'display:flex;justify-content:space-between;gap:12px;align-items:baseline;padding:7px 0' }, [
+        el('div', {}, [
+          el('div', { text: 'Spielraum' }),
+          el('div.faint', { text: `${num(p.potenzial * 12, 0)} € im Jahr`, style: 'font-size:12px;margin-top:1px' }),
+        ]),
+        el('span.num.pos', { text: '+' + eur(p.potenzial), style: 'font-weight:600;font-size:17px' }),
+      ]),
+    ]));
+  }
+
+  return abschnitt('Mieterhöhung', 'Spielraum nach § 558 BGB', inhalt,
+    'Eine Abschätzung, <strong>kein Erhöhungsschreiben</strong>. Form und Begründung des '
+    + 'Verlangens regelt § 558a BGB, Modernisierungen § 559 BGB. Die Kappungsgrenze liegt bei '
+    + '20 %, in Gebieten mit angespanntem Wohnungsmarkt bei 15 % – welche gilt, sagt die '
+    + 'Verordnung deines Landes; abweichend eintragen kannst du sie am Objekt.');
 }

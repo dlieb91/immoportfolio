@@ -9,7 +9,7 @@ import { uid, zeitstempel, heuteISO } from './util.js';
 import { planeSpeichern } from './storage.js';
 import { tilgungsplan } from './finanzmathematik.js';
 
-export const SCHEMA_VERSION = 11;
+export const SCHEMA_VERSION = 12;
 
 export const STANDARD_EINSTELLUNGEN = {
   // Steuern
@@ -22,6 +22,8 @@ export const STANDARD_EINSTELLUNGEN = {
   wertsteigerung: 2.0,        // % p.a.
   instandhaltungProzent: 1.0, // % vom Kaufpreis p.a.
   leerstandProzent: 2.0,
+  // § 558 Abs. 3 BGB: 20 %, in Gebieten mit angespanntem Wohnungsmarkt 15 %
+  kappungsgrenzeProzent: 20,
   inflation: 2.0,
   anschlusszins: 4.5,         // % nach Ablauf der Zinsbindung
   verkaufNachJahren: null,    // Verkaufsszenario im Forecast, leer = kein Verkauf
@@ -279,6 +281,17 @@ export function migrieren(daten) {
     daten.schemaVersion = 11;
   }
 
+  if (v < 12) {
+    // Mieterhoehung nach § 558 BGB: zwei Felder, beide ohne Wirkung bis gefuellt.
+    for (const o of daten.objekte || []) {
+      if (o.kappungsgrenzeAbweichend === undefined) o.kappungsgrenzeAbweichend = null;
+    }
+    for (const e of daten.einheiten || []) {
+      if (e.vergleichsmieteQm === undefined) e.vergleichsmieteQm = null;
+    }
+    daten.schemaVersion = 12;
+  }
+
   const basis = neuesPortfolio(daten.meta?.name);
   const zusammen = {
     ...basis,
@@ -361,6 +374,8 @@ export function neuesObjekt(einstellungen = STANDARD_EINSTELLUNGEN) {
     flaeche: null, zimmer: null,   // bei Einzelobjekten
     kaufdatum: heuteISO(),
     kaufpreis: null,
+    // Leer = Vorgabe aus den Einstellungen. Gilt je Gemeinde, nicht je Portfolio.
+    kappungsgrenzeAbweichend: null,
     // Nachtraegliche Kaufpreisreduktion, etwa eine zurueckflieszende Provision.
     // Mindert die Anschaffungskosten, nicht die auf den beurkundeten Kaufpreis
     // festgesetzten Nebenkosten.
@@ -402,6 +417,9 @@ export function neueEinheit(objektId, bezeichnung = '') {
     flaeche: null,
     zimmer: null,
     implizit: false,   // true = automatisch angelegte Einheit eines Einzelobjekts
+    // Ortsuebliche Vergleichsmiete in € je m², aus dem Mietspiegel. Ohne sie
+    // begrenzt nur die Kappungsgrenze – die Obergrenze bleibt dann offen.
+    vergleichsmieteQm: null,
     notizen: '',
   };
 }

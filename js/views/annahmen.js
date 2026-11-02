@@ -25,6 +25,10 @@ export function annahmenFelder(e, neu) {
       hint: 'vom Kaufpreis, wenn am Objekt nichts erfasst ist',
     }),
     zahlFeld('Leerstandsquote', e, 'leerstandProzent', { suffix: '%', nachkomma: 1, nach: neu }),
+    zahlFeld('Kappungsgrenze', e, 'kappungsgrenzeProzent', {
+      suffix: '%', nachkomma: 0, nach: neu,
+      hint: '§ 558 Abs. 3 BGB · 20 % allgemein, 15 % in Gebieten mit angespanntem Wohnungsmarkt',
+    }),
     zahlFeld('Inflation p. a.', e, 'inflation', { suffix: '%', nachkomma: 1, hint: 'steigert die Kosten', nach: neu }),
     zahlFeld('Anschlusszins', e, 'anschlusszins', { suffix: '%', nachkomma: 2, hint: 'nach Ablauf der Zinsbindung', nach: neu }),
     zahlFeld('Steuersatz', e, 'steuersatz', { suffix: '%', nachkomma: 1, nach: neu }),

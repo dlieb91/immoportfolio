@@ -7,6 +7,7 @@ import {
 } from '../kennzahlen.js';
 import { prognose, basisParameter } from '../forecast.js';
 import { erhaltungsAmpel, spekulationsfrist } from '../buchhaltung.js';
+import { erhoehbareVertraege } from '../mieterhoehung.js';
 import { speicher } from '../storage.js';
 
 export const dashboard = {
@@ -387,6 +388,20 @@ function warnungen() {
       detail: pk.rueckstandSeit
         ? `offen seit ${monatKurz(pk.rueckstandSeit)} · zählt weder im Cashflow noch als Einnahme`
         : 'zählt weder im Cashflow noch als Einnahme',
+    });
+  }
+
+  /* Mieterhöhungen, deren Sperrfrist abgelaufen ist oder bald abläuft.
+     Früher zu melden hilft nicht: Vorher lässt sich nichts durchsetzen. */
+  const erhoehbar = erhoehbareVertraege(heute);
+  if (erhoehbar.length) {
+    const summe = erhoehbar.reduce((s, x) => s + x.potenzial, 0);
+    punkte.push({
+      art: 'info', ziel: `#/mietvertrag?id=${erhoehbar[0].mv.id}`,
+      text: `${erhoehbar.length} Mietvertrag/-verträge mit Erhöhungsspielraum · ${eur(summe, 0)} / Monat`,
+      detail: erhoehbar.slice(0, 3).map((x) =>
+        `${x.mv.mieter || 'ohne Mieter'}: +${eur(x.potenzial, 0)}`
+        + (x.obergrenzeUnbekannt ? ' (ohne Mietspiegelwert)' : '')).join(' · '),
     });
   }
 
