@@ -887,3 +887,9 @@ body.touch table.data td select { min-height: 38px; font-size: 16px; }
 /* Waagerecht scrollende Tabellen mit Schwung – die Jahresreihen in
    Forecast und Einzelobjekt bleiben bewusst Tabellen. */
 .plan-scroll { -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; }
+
+/* Zahlungseingang in der Buchhaltung: offen, eingegangen, nicht verfolgt.
+   Der unverfolgte Zustand bleibt bewusst blass – er ist der Normalfall und
+   soll die Zeile nicht einfärben. */
+.icon-mini.warnend { color: var(--warn); border-color: var(--warn); font-weight: 700; }
+.icon-mini.bestaetigt { color: var(--pos); border-color: var(--pos); }

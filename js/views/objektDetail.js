@@ -22,7 +22,7 @@ import {
 import {
   afaWerte, objektKennzahlen, steuerModus, effektiverSteuersatz, kapitalbindung,
 } from '../kennzahlen.js';
-import { KATEGORIEN, nkAbrechnungObjekt, erhaltungsAmpel, fahrtBetrag } from '../buchhaltung.js';
+import { KATEGORIEN, nkAbrechnungObjekt, erhaltungsAmpel, fahrtBetrag, spekulationsfrist } from '../buchhaltung.js';
 import { dokumenteKarte, protokollKarte, dokumenteEntfernenFuer } from './dokumente.js';
 
 export const objektDetail = {
@@ -824,6 +824,32 @@ function steuerKarte(o, obenNeu) {
   anzeigeNeu();
   const nach = () => { anzeigeNeu(); obenNeu(); };
 
+/**
+ * Spekulationsfrist im Klartext. Steht dauerhaft in der Karte, nicht nur als
+ * Warnung kurz vor Ablauf – wer ein Objekt ansieht, will das Datum wissen.
+ *
+ * Der Hinweis auf das Vertragsdatum ist kein Beiwerk: Massgeblich ist nach
+ * § 23 EStG das obligatorische Geschaeft, waehrend `kaufdatum` hier den
+ * Lastenuebergang meint. Beides kann Monate auseinanderliegen.
+ */
+function fristZeile(o) {
+  const f = spekulationsfrist(o);
+  if (!f) return null;
+  return el('div', { style: 'margin-top:14px;padding-top:14px;border-top:1px solid var(--border)' }, [
+    el('div', { style: 'display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:baseline' }, [
+      el('span', { text: 'Spekulationsfrist (§ 23 EStG)' }),
+      f.steuerfrei
+        ? el('span.badge.gruen', { text: 'abgelaufen – Verkauf steuerfrei' })
+        : el('span.num', { style: 'font-weight:600', text: `steuerfrei ab ${datum(f.steuerfreiAb)}` }),
+    ]),
+    el('div.hint', { style: 'margin-top:4px', text: f.steuerfrei
+      ? 'Ein Veräußerungsgewinn ist nicht mehr zu versteuern.'
+      : `Noch ${f.tageRest} Tage. Bis dahin ist ein Veräußerungsgewinn voll zu versteuern. `
+        + 'Gerechnet ab dem Kaufdatum – maßgeblich ist das Datum des Kaufvertrags, '
+        + 'nicht der Übergang von Nutzen und Lasten. Weichen beide ab, bitte selbst nachrechnen.' }),
+  ]);
+}
+
   return abschnitt('Steuerliche Angaben', 'Grundlage für Abschreibung und Nachsteuer-Rechnung', [
     felderGitter([
       zahlFeld('Grundstücksanteil', o, 'grundstuecksanteil', {
@@ -848,6 +874,7 @@ function steuerKarte(o, obenNeu) {
     el('div', { style: 'margin-top:10px;padding-top:14px;border-top:1px solid var(--border)' }, [
       felderGitter([anschaffung.feld, grundstueck.feld, bemessung.feld, proJahr.feld]),
     ]),
+    fristZeile(o),
   ]);
 }
 

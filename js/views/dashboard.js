@@ -6,7 +6,7 @@ import {
   portfolioKennzahlen, steuerModus, cashflowAktuell, kapitalbindungPortfolio,
 } from '../kennzahlen.js';
 import { prognose, basisParameter } from '../forecast.js';
-import { erhaltungsAmpel } from '../buchhaltung.js';
+import { erhaltungsAmpel, spekulationsfrist } from '../buchhaltung.js';
 import { speicher } from '../storage.js';
 
 export const dashboard = {
@@ -375,6 +375,30 @@ function warnungen() {
       text: (ampel.stufe === 'rot' ? 'Über der 15-%-Grenze: ' : 'Nähert sich der 15-%-Grenze: ')
         + (o.bezeichnung || 'Objekt'),
       detail: `Erhaltungsaufwand seit dem Kauf ${eur(ampel.summe, 0)} von ${eur(ampel.grenze, 0)}`,
+    });
+  }
+
+  // Mietrückstände – nur sichtbar, wo der Zahlungseingang verfolgt wird
+  const pk = portfolioKennzahlen();
+  if (pk.mietrueckstand > 0.005) {
+    punkte.push({
+      art: 'warn', ziel: '#/buchhaltung',
+      text: `${eur(pk.mietrueckstand, 0)} Mietrückstand`,
+      detail: pk.rueckstandSeit
+        ? `offen seit ${monatKurz(pk.rueckstandSeit)} · zählt weder im Cashflow noch als Einnahme`
+        : 'zählt weder im Cashflow noch als Einnahme',
+    });
+  }
+
+  /* Spekulationsfrist (§ 23 EStG) – erst im letzten Jahr vor Ablauf.
+     Ein frisch gekauftes Objekt neun Jahre lang anzumahnen wäre Lärm. */
+  for (const o of d.objekte) {
+    const f = spekulationsfrist(o, heute);
+    if (!f || f.steuerfrei || f.tageRest > 365) continue;
+    punkte.push({
+      art: 'info', ziel: `#/objekt?id=${o.id}`,
+      text: `${o.bezeichnung || 'Objekt'}: ab ${datum(f.steuerfreiAb)} steuerfrei verkäuflich`,
+      detail: `noch ${f.tageRest} Tage · bis dahin ist ein Veräußerungsgewinn voll zu versteuern`,
     });
   }
 

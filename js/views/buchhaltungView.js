@@ -24,6 +24,7 @@ const filter = {
   art: '',
   herkunft: '',
   nurKorrigiert: false,
+  nurOffen: false,
   mitGeplanten: false,
 };
 let sichtbar = SCHRITT;
@@ -73,6 +74,7 @@ function abfrage() {
     art: filter.art || null,
     herkunft: filter.herkunft || null,
     nurKorrigiert: filter.nurKorrigiert,
+    nurOffen: filter.nurOffen,
     mitGeplanten: filter.mitGeplanten,
   };
 }
@@ -147,6 +149,12 @@ function filterKarte(neu, treffer) {
     onclick: () => { filter.nurKorrigiert = !filter.nurKorrigiert; sichtbar = SCHRITT; neu(); },
   }, [filter.nurKorrigiert ? '✓ Nur Korrekturen' : 'Nur Korrekturen']);
 
+  const nurOffen = el('button.btn.btn-sm' + (filter.nurOffen ? '.btn-primary' : ''), {
+    type: 'button',
+    title: 'Nur Mieten und Nebenkosten, bei denen noch etwas aussteht',
+    onclick: () => { filter.nurOffen = !filter.nurOffen; sichtbar = SCHRITT; neu(); },
+  }, [filter.nurOffen ? '✓ Nur offene Posten' : 'Nur offene Posten']);
+
   const geplante = el('button.btn.btn-sm' + (filter.mitGeplanten ? '.btn-primary' : ''), {
     type: 'button',
     title: 'Monate, die im Kalenderjahr noch kommen – rechnerisch enthalten, aber noch nicht geflossen',
@@ -166,6 +174,7 @@ function filterKarte(neu, treffer) {
       feld('Kategorie', artSel),
       feld('Herkunft', herkunftSel),
       feld(' ', nurKorr),
+      feld(' ', nurOffen),
       feld(' ', geplante),
       el('span', { style: 'flex:1' }),
       el('div', { style: 'text-align:right' }, [
@@ -213,13 +222,18 @@ function summen(liste) {
   for (const g of GRUPPEN) proGruppe[g] = 0;
   let einnahmen = 0, ausgaben = 0, durchlaufend = 0, neutral = 0;
 
+  let rueckstand = 0;
   for (const z of liste) {
     const a = artInfo(z.art);
-    proGruppe[a.gruppe] = (proGruppe[a.gruppe] || 0) + z.betrag * a.vorzeichen;
-    if (a.durchlaufend) durchlaufend += z.betrag * a.vorzeichen;
-    else if (a.gruppe === 'Neutral') neutral += z.betrag * a.vorzeichen;
-    else if (a.vorzeichen > 0) einnahmen += z.betrag;
-    else ausgaben += z.betrag;
+    /* Gerechnet wird mit dem Ist. Ohne Verfolgung ist `ist` gleich `betrag`,
+       die Kacheln bleiben also unveraendert – siehe zahlungen.js. */
+    const wert = z.ist ?? z.betrag;
+    rueckstand += z.rueckstand || 0;
+    proGruppe[a.gruppe] = (proGruppe[a.gruppe] || 0) + wert * a.vorzeichen;
+    if (a.durchlaufend) durchlaufend += wert * a.vorzeichen;
+    else if (a.gruppe === 'Neutral') neutral += wert * a.vorzeichen;
+    else if (a.vorzeichen > 0) einnahmen += wert;
+    else ausgaben += wert;
   }
 
   const kachel = (label, wert, sub, klasse) => el('div.summe', {}, [
@@ -238,6 +252,8 @@ function summen(liste) {
     kachel('Finanzierung', eur(-proGruppe.Finanzierung, 0), 'Zins, Tilgung, Sondertilgung'),
     kachel('Saldo', eur(saldo, 0), 'Einnahmen abzüglich Ausgaben', saldo >= 0 ? 'pos' : 'neg'),
     kachel('Durchlaufend', eur(durchlaufend, 0), 'Umlagen ↔ umlagefähige Kosten'),
+    // Nur zeigen, wo der Zahlungseingang überhaupt verfolgt wird.
+    rueckstand > 0.005 ? kachel('Offen', eur(rueckstand, 0), 'noch nicht eingegangen', 'neg') : null,
     neutral ? kachel('Neutral', eur(neutral, 0), 'Kaution, Privatentnahme/-einlage') : null,
   ].filter(Boolean));
 }
@@ -268,7 +284,10 @@ function tabelle(liste, neu) {
           el('th', { style: 'text-align:right', text: 'Betrag' }),
           el('th', { style: 'text-align:right', text: 'Vorgabe / km' }),
           el('th', { text: 'Notiz' }),
-          el('th', {}),
+          /* Beschriftet, damit die Knopfspalte in der Kartendarstellung auf
+             schmalen Geräten nicht als zwei rätselhafte Zeichen dasteht –
+             dort gibt es kein Überfahren und damit keinen Tooltip. */
+          el('th', { text: 'Status' }),
         ])]),
         el('tbody', {}, zeilen),
       ]),
@@ -285,6 +304,34 @@ function tabelle(liste, neu) {
   }
 
   return box;
+}
+
+/* ---------- Zahlungseingang ----------
+
+   Nur bei Miete und Nebenkosten; `verfolgt` und `rueckstand` liefert
+   monatszahlungen(). Drei Zustaende, ein Klick im Kreis:
+   nicht verfolgt → offen → eingegangen → nicht verfolgt.
+
+   „Nicht verfolgt" ist der Ausgangszustand und bedeutet: Der Sollbetrag
+   gilt als geflossen, so wie vor der Einfuehrung des Feldes. */
+
+const EINGANG_ARTEN = new Set(['miete', 'nebenkosten']);
+
+function eingangsKnopf(z, neu) {
+  if (!EINGANG_ARTEN.has(z.art) || z.entfaellt || z.geplant) return null;
+
+  const offen = z.verfolgt && z.rueckstand > 0.005;
+  const da = z.verfolgt && !offen;
+  const naechster = !z.verfolgt ? 0 : (offen ? z.betrag : null);
+
+  return el('button.icon-mini' + (offen ? '.warnend' : da ? '.bestaetigt' : ''), {
+    type: 'button',
+    title: offen ? `${eur(z.rueckstand)} offen – klicken: als eingegangen buchen`
+      : da ? 'eingegangen – klicken: Verfolgung aufheben'
+        : 'Zahlungseingang verfolgen – klicken: als offen buchen',
+    text: offen ? '!' : da ? '✓' : '○',
+    onclick: () => { korrekturSetzen(z, { eingegangen: naechster }); neu(); },
+  });
 }
 
 function abgeleiteteZeile(z, neu) {
@@ -320,7 +367,8 @@ function abgeleiteteZeile(z, neu) {
       type: 'text', value: z.notiz, placeholder: z.korrigiert ? 'Grund der Korrektur' : '',
       onchange: (ev) => korrekturSetzen(z, { notiz: ev.target.value }),
     })]),
-    el('td', { style: 'width:96px;white-space:nowrap' }, [
+    el('td', { style: 'width:132px;white-space:nowrap' }, [
+      eingangsKnopf(z, neu),
       el('button.icon-mini', {
         type: 'button', title: z.entfaellt ? 'Zahlung wieder ansetzen' : 'Zahlung ist ausgefallen',
         text: z.entfaellt ? '↺' : '∅',
@@ -404,9 +452,15 @@ function korrekturSetzen(z, aenderung) {
     if (aenderung.betrag !== undefined) eintrag.betrag = aenderung.betrag;
     if (aenderung.entfaellt !== undefined) eintrag.entfaellt = aenderung.entfaellt;
     if (aenderung.notiz !== undefined) eintrag.notiz = aenderung.notiz;
+    if (aenderung.eingegangen !== undefined) eintrag.eingegangen = aenderung.eingegangen;
 
+    /* `eingegangen` muss hier mitgeprueft werden. Sonst gilt eine Zeile, in
+       der nur der Zahlungseingang verfolgt wird, als „wie die Vorgabe" –
+       der Eintrag floege raus und die Verfolgung waere beim naechsten
+       Aufbau wieder weg. */
     const wieVorgabe = !eintrag.entfaellt
       && (eintrag.betrag == null || Math.abs(eintrag.betrag - z.standard) < 0.005)
+      && eintrag.eingegangen == null
       && !eintrag.notiz;
 
     d.zahlungen = (d.zahlungen || []).filter((x) => x.id !== (vorhanden?.id));

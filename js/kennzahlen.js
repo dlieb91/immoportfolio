@@ -280,6 +280,10 @@ export function objektKennzahlen(o, stichtag = heuteISO()) {
     // Werbungskosten, beide ausserhalb des Cashflows. nkSaldo ist die
     // tatsaechliche Differenz – bei Leerstand negativ.
     umlagen: ist.umlagen, betriebskostenUmlagefaehig: ist.betriebskostenUmlagefaehig, nkSaldo,
+    /* Offene Mieten. Wo der Eingang verfolgt wird, enthalten Miete und
+       Einkuenfte oben bereits nur das tatsaechlich Geflossene – das hier ist
+       die Gegenprobe: was noch aussteht und seit wann. */
+    mietrueckstand: ist.mietrueckstand || 0, rueckstandSeit: ist.rueckstandSeit || null,
     // Frei erfasste Werbungskosten – je Gruppe und in Summe
     erhaltung: ist.erhaltung, fahrtkosten: ist.fahrtkosten, sonstigeWk: ist.sonstigeWk,
     werbungskostenFrei: ist.werbungskostenFrei, neutral: ist.neutral,
@@ -451,6 +455,8 @@ export function portfolioKennzahlen(stichtag = heuteISO()) {
     steuer: summe('steuer'),
     einkuenfte: summe('einkuenfte'),
     umlagen: summe('umlagen'),
+    mietrueckstand: summe('mietrueckstand'),
+    rueckstandSeit: objekte.map((k) => k.rueckstandSeit).filter(Boolean).sort()[0] || null,
     betriebskostenUmlagefaehig: summe('betriebskostenUmlagefaehig'),
     nkSaldo: summe('nkSaldo'),
     erhaltung: summe('erhaltung'),

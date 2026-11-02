@@ -108,10 +108,47 @@ export function korrekturFinden(p, art, bezugId) {
 }
 
 export function neueKorrektur(p, art, objektId, bezugId) {
-  return { id: uid('zk'), periode: p, art, objektId, bezugId, betrag: null, entfaellt: false, notiz: '' };
+  return {
+    id: uid('zk'), periode: p, art, objektId, bezugId,
+    betrag: null, entfaellt: false, notiz: '',
+    /* Tatsaechlich geflossener Betrag. null heisst „nicht verfolgt" – dann
+       gilt wie bisher der Sollbetrag als zugeflossen. 0 heisst „steht noch
+       aus", ein Teilbetrag heisst Teilzahlung. Ein einziges Zahlenfeld
+       statt eines zweiten Statusfeldes: sonst gaebe es zwei Wahrheiten
+       ueber denselben Sachverhalt, die auseinanderlaufen koennen. */
+    eingegangen: null,
+  };
 }
 
 /* ---------- Erzeugung ---------- */
+
+/* ---------- Soll und Ist ----------
+
+   Verfolgt wird nur bei den abgeleiteten Einnahmen. Beim Hausgeld einen
+   Zahlungseingang abzuhaken ergaebe keinen Sinn: Das ist eine Ausgabe, die
+   man selbst ausloest. Frei erfasste Buchungen tragen ohnehin ein echtes
+   Zahlungsdatum und brauchen die Unterscheidung nicht. */
+
+const EINGANG_ARTEN = new Set(['miete', 'nebenkosten']);
+
+/**
+ * `eingegangen` null heisst „nicht verfolgt" – dann gilt der Sollbetrag als
+ * zugeflossen, genau wie vor der Einfuehrung des Feldes. Das ist die
+ * Regressionsgrenze des ganzen Umbaus: Bestehende Portfolios haben ueberall
+ * null stehen und duerfen sich um keinen Cent bewegen.
+ */
+function eingangsfelder(art, betrag, korr) {
+  if (!EINGANG_ARTEN.has(art) || korr?.eingegangen == null) {
+    return { verfolgt: false, eingegangen: null, rueckstand: 0, ist: betrag };
+  }
+  const eingegangen = Math.max(0, korr.eingegangen);
+  return {
+    verfolgt: true,
+    eingegangen,
+    rueckstand: Math.max(0, betrag - eingegangen),
+    ist: eingegangen,
+  };
+}
 
 /**
  * Alle Zahlungen eines Objekts in einem Monat, Korrekturen bereits angewendet.
@@ -137,6 +174,7 @@ export function monatszahlungen(o, jahr, monat) {
       korrigiert: !!korr && (korr.entfaellt || (korr.betrag != null && Math.abs(korr.betrag - standard) > 0.005)),
       entfaellt: !!korr?.entfaellt,
       notiz: korr?.notiz || '',
+      ...eingangsfelder(art, betrag, korr),
     });
   };
 
@@ -189,6 +227,7 @@ export function monatszahlungen(o, jahr, monat) {
       standard: 0, betrag: korr.entfaellt ? 0 : (korr.betrag || 0),
       korrigiert: true, entfaellt: !!korr.entfaellt, notiz: korr.notiz || '',
       nurKorrektur: true,
+      ...eingangsfelder(korr.art, korr.entfaellt ? 0 : (korr.betrag || 0), korr),
     });
   }
 
@@ -212,7 +251,7 @@ function bezugName(korr) {
  * Kalenderjahres sind rechnerisch vorhanden, aber noch nicht geflossen.
  * Mit `mitGeplanten` lassen sie sich einblenden.
  *
- * @param filter { vonJahr, bisJahr, objektId, einheitId, art, nurKorrigiert, mitGeplanten }
+ * @param filter { vonJahr, bisJahr, objektId, einheitId, art, nurKorrigiert, nurOffen, mitGeplanten }
  */
 export function zahlungsliste(filter = {}) {
   const objekte = filter.objektId
@@ -235,6 +274,7 @@ export function zahlungsliste(filter = {}) {
         for (const z of monatszahlungen(o, jahr, monat)) {
           if (filter.art && z.art !== filter.art) continue;
           if (filter.nurKorrigiert && !z.korrigiert) continue;
+          if (filter.nurOffen && !(z.rueckstand > 0.005)) continue;
           if (einheitVertraege && !einheitVertraege.has(z.bezugId)) continue;
           raus.push(z);
         }
@@ -248,7 +288,7 @@ export function zahlungsliste(filter = {}) {
 }
 
 /** Vorzeichenbehafteter Betrag – Einnahmen positiv, Kosten negativ. */
-export const wirkung = (z) => z.betrag * artInfo(z.art).vorzeichen;
+export const wirkung = (z) => (z.ist ?? z.betrag) * artInfo(z.art).vorzeichen;
 
 /* Jahressummen sind der teuerste Pfad der App: die Kapitalbindung ruft sie
    je Objekt fuer jedes Jahr seit dem Kauf auf, und jeder Aufruf laeuft zwoelf
@@ -300,16 +340,24 @@ function imZeitraum(datum, jahr, bisMonat) {
 
 function jahresSummenRechnen(objektId, jahr, bisMonat) {
   const o = objektMit(objektId);
-  const summe = { mieteMonate: 0, korrekturen: 0 };
+  const summe = { mieteMonate: 0, korrekturen: 0, mietrueckstand: 0, rueckstandSeit: null };
   for (const k of KATEGORIEN) summe[k.key] = 0;
   if (!o) return summe;
 
   for (let monat = 1; monat <= bisMonat; monat++) {
     let mieteImMonat = 0;
     for (const z of monatszahlungen(o, jahr, monat)) {
-      if (summe[z.art] !== undefined) summe[z.art] += z.betrag;
-      if (z.art === 'miete') mieteImMonat += z.betrag;
+      /* `ist` ist der tatsaechlich geflossene Betrag. Ohne Verfolgung ist er
+         gleich `betrag` – deshalb aendert das hier nichts an bestehenden
+         Portfolios. Steuerlich ist das zugleich das Richtige: Nicht gezahlte
+         Miete ist nach dem Zuflussprinzip (§ 11 EStG) keine Einnahme. */
+      if (summe[z.art] !== undefined) summe[z.art] += z.ist;
+      if (z.art === 'miete') mieteImMonat += z.ist;
       if (z.korrigiert) summe.korrekturen++;
+      if (z.rueckstand > 0) {
+        summe.mietrueckstand += z.rueckstand;
+        if (!summe.rueckstandSeit || z.periode < summe.rueckstandSeit) summe.rueckstandSeit = z.periode;
+      }
     }
     if (mieteImMonat > 0) summe.mieteMonate++;
   }

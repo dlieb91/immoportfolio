@@ -207,6 +207,7 @@ werden bewusst nicht verglichen; die laufen auf zwei Geräten ohnehin auseinande
 | 10 | Austauschbare Speicherschicht, Gerätespeicher fürs iPad, Web-App-Hülle | fertig |
 | 11 | Dropbox-Abgleich mit Offline-Betrieb | fertig |
 | 12 | Touch-Bedienung fürs iPad | fertig |
+| 13 | Spekulationsfrist, offene § 82b-Verteilungen, Soll/Ist bei den Mieten | fertig |
 
 ## Aufbau des Codes
 
@@ -450,6 +451,25 @@ der Gliederung der Anlage V – je Objekt und fürs ganze Portfolio, exportierba
 - **Die 10-Tage-Regel des § 11 EStG** (regelmäßig wiederkehrende Zahlungen kurz vor oder
   nach dem Jahreswechsel gelten für das Jahr, zu dem sie wirtschaftlich gehören) wendet die
   App **nicht automatisch** an – gebucht wird nach dem eingetragenen Datum.
+- **Die Spekulationsfrist rechnet ab `kaufdatum`.** Maßgeblich ist nach § 23 EStG das
+  Datum des **Kaufvertrags**; das Feld dient in der App zugleich dem AfA-Beginn und meint
+  damit eher den Übergang von Nutzen und Lasten. Weichen beide ab, ist die angezeigte
+  Frist eine Orientierung und kein Freibrief.
+- **Ein Verkauf vor Ablauf einer § 82b-Verteilung** lässt den Restbetrag in einer Summe
+  abziehbar werden. Die App kennt keinen Verkaufsvorgang und rechnet das nicht.
+
+**Zahlungseingang.** Abgeleitete Mieten und Nebenkosten gelten zunächst als geflossen – so
+war es immer, und solange du nichts abhakst, ändert sich nichts. Über den Knopf in der
+Spalte *Status* schaltest du eine Zeile im Kreis: *nicht verfolgt → offen → eingegangen*.
+Ein Teilbetrag lässt sich ebenso eintragen.
+
+Was offen ist, zählt **weder im Cashflow noch als Einnahme** – das ist nicht nur
+Buchhaltung, sondern steuerlich das Richtige: Nach dem Zuflussprinzip (§ 11 EStG) ist nicht
+gezahlte Miete keine Einnahme. Der Filter *Nur offene Posten*, die Kachel *Offen* und ein
+Hinweis im Dashboard führen die Rückstände zusammen.
+
+Der **Forecast bleibt davon unberührt**. Er ist vorausschauend und rechnet mit den
+Stammdaten; ein Rückstand aus dem Mai gehört nicht in eine Zehnjahresprognose.
 
 **Dokumente** hängst du per Drag & Drop an ein Objekt, einen Mietvertrag oder ein Darlehen.
 Sie landen unverändert im Unterordner `dokumente`, die Kategorie wird aus dem Dateinamen

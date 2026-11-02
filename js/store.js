@@ -9,7 +9,7 @@ import { uid, zeitstempel, heuteISO } from './util.js';
 import { planeSpeichern } from './storage.js';
 import { tilgungsplan } from './finanzmathematik.js';
 
-export const SCHEMA_VERSION = 10;
+export const SCHEMA_VERSION = 11;
 
 export const STANDARD_EINSTELLUNGEN = {
   // Steuern
@@ -267,6 +267,16 @@ export function migrieren(daten) {
       if (daten.meta.geraet === undefined) daten.meta.geraet = null;
     }
     daten.schemaVersion = 10;
+  }
+
+  if (v < 11) {
+    /* Soll/Ist bei den Mieten: `eingegangen` tritt an die vorhandenen
+       Zahlungskorrekturen. null heisst „nicht verfolgt" und ist genau das,
+       was bisher galt – deshalb aendert dieser Schritt keine einzige Zahl. */
+    for (const k of daten.zahlungen || []) {
+      if (k.eingegangen === undefined) k.eingegangen = null;
+    }
+    daten.schemaVersion = 11;
   }
 
   const basis = neuesPortfolio(daten.meta?.name);
