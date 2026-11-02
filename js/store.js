@@ -692,6 +692,55 @@ export function mieteEinheit(einheitId, stichtag = heuteISO()) {
 }
 
 /** Mieteinnahmen eines Objekts zum Stichtag, summiert ueber alle Einheiten. */
+/**
+ * Vereinbarte Miete einer Einheit – die geltende, sonst die nächste
+ * unterschriebene.
+ *
+ * Gebraucht für die Runrate und alles, was darauf fußt (Bruttomietrendite,
+ * Faktor, DSCR, EK-Rendite). Die reine Momentaufnahme taugt dafür nicht:
+ * Kosten und Kapitaldienst werden dort aufs volle Jahr gerechnet, und
+ * davor null Miete zu stellen, weil der Mieter erst nächsten Monat
+ * einzieht, vergleicht zwei verschiedene Zeitpunkte miteinander.
+ *
+ * Beendete Verträge zählen nicht – nur was gilt oder noch kommt.
+ */
+export function mieteVereinbartEinheit(einheitId, stichtag = heuteISO()) {
+  const laufend = mieteEinheit(einheitId, stichtag);
+  if (laufend.anzahl) return { kalt: laufend.kalt, nk: laufend.nk, kuenftig: false };
+
+  /* Alle kuenftigen Vertraege dieser Einheit, die am selben Tag beginnen:
+     In einer WG haengen mehrere Zimmervertraege an derselben Einheit und
+     laufen nebeneinander – nur den ersten zu nehmen unterschlaege den Rest.
+     Spaetere Starttermine bleiben aussen vor, sonst summierte man
+     Nachmieter zu Bestandsmietern hinzu. */
+  const kuenftige = state.daten.mietvertraege
+    .filter((m) => m.einheitId === einheitId && vertragStatus(m, stichtag) === 'zukuenftig')
+    .sort((a, b) => String(a.beginn).localeCompare(String(b.beginn)));
+  if (!kuenftige.length) return { kalt: 0, nk: 0, kuenftig: false };
+
+  const start = kuenftige[0].beginn;
+  let kalt = 0, nk = 0;
+  for (const mv of kuenftige) {
+    if (mv.beginn !== start) continue;
+    const erste = [...(mv.konditionen || [])]
+      .sort((a, b) => String(a.gueltigAb).localeCompare(String(b.gueltigAb)))[0];
+    kalt += erste?.kaltmiete || 0;
+    nk += erste?.nkVorauszahlung || 0;
+  }
+  return { kalt, nk, kuenftig: true };
+}
+
+/** Dasselbe über alle Einheiten eines Objekts. */
+export function mieteVereinbartObjekt(objektId, stichtag = heuteISO()) {
+  let kalt = 0, nk = 0, kuenftig = false;
+  for (const e of einheitenVon(objektId)) {
+    const m = mieteVereinbartEinheit(e.id, stichtag);
+    kalt += m.kalt; nk += m.nk;
+    if (m.kuenftig && m.kalt) kuenftig = true;
+  }
+  return { kalt, nk, warm: kalt + nk, kuenftig };
+}
+
 export function mieteObjekt(objektId, stichtag = heuteISO()) {
   let kalt = 0, nk = 0, vermietet = 0, vertraege = 0;
   const einheiten = einheitenVon(objektId);

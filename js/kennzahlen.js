@@ -20,6 +20,7 @@ import { heuteISO } from './util.js';
 import {
   state, einheitenVon, finanzierungenVon, mieteObjekt, mieteEinheit,
   nebenkostenBerechnen, flaecheVon, verkehrswert, besitzMonate, darlehenPlan,
+  mieteVereinbartObjekt,
 } from './store.js';
 import { restschuldZu, ersatzGuthabenZu, ersatzEingezahltBis } from './finanzmathematik.js';
 import { jahresSummen } from './zahlungen.js';
@@ -238,7 +239,14 @@ export function objektKennzahlen(o, stichtag = heuteISO()) {
      den stabilen, wiederkehrenden Feldern (Miete, Kostenfelder, Tilgungsplan)
      und bewusst ohne frei erfasste Buchungen – die sind einzelne historische
      Vorfälle ohne Wiederholungsmuster und würden die Kennzahl verzerren. */
-  const kaltmieteRunrate = miete.kalt * 12;
+  /* Die Runrate fragt „was bringt das, wenn es läuft?" – deshalb die
+     vereinbarte Miete, nicht die heute schon fließende. Kosten und
+     Kapitaldienst stehen hier ohnehin mit zwölf Monaten; davor null Miete
+     zu setzen, weil der Mieter erst nächsten Monat einzieht, verglich zwei
+     verschiedene Zeitpunkte und machte die Kennzahlen vor dem Einzug
+     unbrauchbar. */
+  const mieteVereinbart = mieteVereinbartObjekt(o.id, stichtag);
+  const kaltmieteRunrate = mieteVereinbart.kalt * 12;
   const cashflowRunrate = kaltmieteRunrate - bewirtschaftungVoll - kapitaldienst12;
   const einkuenfteRunrate = kaltmieteRunrate - bewirtschaftungVoll - zins12 - afa.afaJahr;
   const steuerRunrate = einkuenfteRunrate * steuersatz / 100;
@@ -268,7 +276,10 @@ export function objektKennzahlen(o, stichtag = heuteISO()) {
     // Miete
     kaltmieteMonat: miete.kalt,
     kaltmieteJahr,                 // tatsächlich im Kalenderjahr
-    kaltmieteRunrate,              // 12 × aktuelle Monatsmiete
+    kaltmieteRunrate,              // 12 × vereinbarte Monatsmiete
+    kaltmieteVereinbart: mieteVereinbart.kalt,
+    // true, wenn die Runrate auf einem noch nicht begonnenen Vertrag beruht
+    mieteNochKuenftig: mieteVereinbart.kuenftig,
     nkMonat: miete.nk,
     einheiten: miete.einheiten,
     vermietet: miete.vermietet,
@@ -464,6 +475,9 @@ export function portfolioKennzahlen(stichtag = heuteISO()) {
     angeschnitten: objekte.some((k) => k.angeschnitten),
     kaltmieteJahr,
     kaltmieteRunrate,
+    kaltmieteVereinbart: summe('kaltmieteVereinbart'),
+    // true, sobald irgendein Objekt seine Runrate aus einem künftigen Vertrag zieht
+    mieteNochKuenftig: objekte.some((k) => k.mieteNochKuenftig),
     kaltmieteMonat: summe('kaltmieteMonat'),
     bewirtschaftung,
     zins: summe('zins'),

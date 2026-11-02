@@ -86,14 +86,22 @@ function kennzahlen(p, folge, nach, kb) {
     ] : []),
     kachel(`Cashflow ${folge.jahr} / Monat`, eur(cfFolge / 12, 0),
       `${eur(cfFolge, 0)} im Jahr ${folge.jahr}`, cfFolge >= 0 ? 'pos' : 'neg'),
-    kachel('Kaltmiete / Monat', eur(p.kaltmieteMonat, 0),
-      `${eur(p.kaltmieteRunrate, 0)} auf zwölf Monate`),
+    /* Vor dem Einzug fließt noch nichts, vereinbart ist aber schon etwas.
+       Beides zu zeigen ist ehrlicher, als eine der beiden Zahlen zu
+       verschweigen. */
+    kachel('Kaltmiete / Monat',
+      eur(p.mieteNochKuenftig ? p.kaltmieteVereinbart : p.kaltmieteMonat, 0),
+      p.mieteNochKuenftig
+        ? `vereinbart · fließt noch nicht · ${eur(p.kaltmieteRunrate, 0)} auf zwölf Monate`
+        : `${eur(p.kaltmieteRunrate, 0)} auf zwölf Monate`),
     kachel('Bruttomietrendite', num(p.bruttorendite, 2) + ' %',
-      `Faktor ${num(p.kaufpreisfaktor, 1)} · netto ${num(p.nettorendite, 2)} %`),
+      `Faktor ${num(p.kaufpreisfaktor, 1)} · netto ${num(p.nettorendite, 2)} %`
+      + ' · auf vereinbarte Jahresmiete'),
     kachel('Eigenkapitalrendite',
       ekRendite != null ? num(ekRendite, 2) + ' %' : '–',
       ekRenditeGesamt != null
         ? `${num(ekRenditeGesamt, 2)} % inkl. Vermögensaufbau · ${nach ? 'nach' : 'vor'} Steuern`
+          + ' · volles Jahr, nicht das Anschaffungsjahr'
         : 'kein Eigenkapital eingesetzt',
       ekRendite != null && ekRendite >= 0 ? 'pos' : ekRendite != null ? 'neg' : ''),
     ...(p.mitErsatz ? [

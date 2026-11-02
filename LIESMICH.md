@@ -359,8 +359,24 @@ der gerade erst begonnen hat.
 monatsgenau angesetzt. Im Anschaffungsjahr sind das entsprechend weniger als zwölf Monate –
 das Dashboard zeigt deshalb **laufendes Jahr, Folgejahr und den Zehnjahresschnitt
 nebeneinander**, jeweils vor und nach Steuern. Für die laufende Belastung ist das Folgejahr
-die aussagekräftige Zahl. Renditen und der Kaufpreisfaktor rechnen dagegen immer mit der
-laufenden Jahresmiete (12 × aktuelle Monatsmiete), damit ein Rumpfjahr sie nicht verzerrt.
+die aussagekräftige Zahl.
+
+**Renditen rechnen auf der Runrate**, nicht auf dem Kalenderjahr: Eigenkapitalrendite,
+Bruttomietrendite, Nettorendite, Kaufpreisfaktor und DSCR fragen *„was bringt das, wenn es
+läuft?"* und setzen Miete, Kosten und Kapitaldienst alle mit zwölf Monaten an. Ein Rumpfjahr
+verzerrt sie damit nicht.
+
+Maßgeblich ist dabei die **vereinbarte** Kaltmiete – die geltende, und solange keine gilt,
+die nächste unterschriebene. Das ist bewusst nicht die heute schon fließende: Kosten und
+Kapitaldienst stehen in derselben Rechnung mit zwölf Monaten, und davor null Miete zu setzen,
+weil der Mieter erst nächsten Monat einzieht, verglich zwei verschiedene Zeitpunkte
+miteinander. Vor dem Einzug stünden sonst alle Renditekennzahlen auf null oder weit im Minus,
+obwohl die Verträge unterschrieben sind.
+
+Deshalb können **Cashflow und Eigenkapitalrendite verschiedene Vorzeichen haben**: Die
+Cashflow-Spalten zeigen ein Kalenderjahr, die Rendite ein volles Betriebsjahr. Im
+Anschaffungsjahr liegen die beiden weit auseinander – an den Kacheln steht die jeweilige
+Grundlage dran.
 
 **Abschreibung.** Der Grundstücksanteil wird auf die **Anschaffungskosten inkl.
 Nebenkosten** angewendet; die Kaufnebenkosten werden damit im selben Verhältnis wie der
