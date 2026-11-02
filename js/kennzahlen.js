@@ -332,23 +332,24 @@ export function objektKennzahlen(o, stichtag = heuteISO()) {
 
 /** Dieselbe Rechnung wie kapitalbindung, über alle Objekte des Portfolios. */
 export function kapitalbindungPortfolio(stichtag = heuteISO()) {
-  let vor = 0, nach = 0, eingesetzt = 0, monate = 0, abMonat = null;
+  let vor = 0, steuerwirkung = 0, eingesetzt = 0, monate = 0, abMonat = null;
   for (const o of state.daten.objekte) {
     const kb = kapitalbindung(o, stichtag);
     vor += kb.kumuliertVorSteuer;
-    nach += kb.kumuliertNachSteuer;
+    steuerwirkung += kb.steuerwirkung;
     eingesetzt += kb.eingesetzt;
     // Längste Besitzdauer im Portfolio – sie bestimmt den Zeitraum der Kachel
     monate = Math.max(monate, kb.monate);
     if (kb.abMonat && (abMonat === null || kb.abMonat < abMonat)) abMonat = kb.abMonat;
   }
   return {
-    abMonat, bis: stichtag.slice(0, 7), monate,
+    abMonat, bis: letzterMonat(stichtag), monate,
     eingesetzt,
     kumuliertVorSteuer: vor,
-    kumuliertNachSteuer: nach,
+    steuerwirkung,
+    kumuliertNachSteuer: vor + steuerwirkung,
     gebundenVorSteuer: eingesetzt - vor,
-    gebundenNachSteuer: eingesetzt - nach,
+    gebundenNachSteuer: eingesetzt - vor - steuerwirkung,
   };
 }
 
@@ -366,13 +367,26 @@ export function kapitalbindungPortfolio(stichtag = heuteISO()) {
  * den tatsächlich erfassten Konditionen und dem Tilgungsplan. Die Steuer
  * wird zeitanteilig angesetzt, obwohl sie erst mit der Veranlagung fließt.
  */
+/**
+ * Der letzte abgeschlossene Monat vor diesem Stichtag, als 'YYYY-MM'.
+ * Im Januar ist das der Dezember des Vorjahres.
+ */
+function letzterMonat(stichtag) {
+  const j = Number(stichtag.slice(0, 4));
+  const m = Number(stichtag.slice(5, 7));
+  return m > 1 ? `${j}-${String(m - 1).padStart(2, '0')}` : `${j - 1}-12`;
+}
+
 export function kapitalbindung(o, stichtag = heuteISO()) {
   const bisJahr = Number(stichtag.slice(0, 4));
-  const bisMonat = Number(stichtag.slice(5, 7));
+  /* Nur **abgeschlossene** Monate. Am 2. November ist der November noch
+     nicht geflossen; ihn voll mitzuzählen hieße, Kosten und Abschreibung
+     für einen Monat anzusetzen, der gerade erst begonnen hat. */
+  const bisMonat = Number(stichtag.slice(5, 7)) - 1;
   const kaufjahr = o.kaufdatum ? Number(o.kaufdatum.slice(0, 4)) : bisJahr;
   const steuersatz = effektiverSteuersatz(o);
 
-  let vor = 0, nach = 0, monate = 0;
+  let vor = 0, steuerwirkung = 0, monate = 0;
   for (let j = kaufjahr; j <= bisJahr; j++) {
     const grenze = j === bisJahr ? bisMonat : 12;
     const ist = jahresSummen(o.id, j, grenze);
@@ -383,7 +397,10 @@ export function kapitalbindung(o, stichtag = heuteISO()) {
     const einkuenfte = ist.miete + ist.umlagen - ist.bewirtschaftung - ist.betriebskostenUmlagefaehig
       - ist.zins - ist.werbungskostenFrei - afaImJahr(o, j, grenze);
     vor += cfVor;
-    nach += cfVor - einkuenfte * steuersatz / 100;
+    /* Getrennt gefuehrt, nicht eingerechnet: Eine Erstattung auf Verluste
+       dieses Jahres fliesst fruehestens mit der Veranlagung im naechsten.
+       Sie gehoert deshalb nicht in eine Zahl, die „geflossen" heisst. */
+    steuerwirkung += -einkuenfte * steuersatz / 100;
     monate += besitzMonateBis(o, j, grenze);
   }
 
@@ -394,13 +411,15 @@ export function kapitalbindung(o, stichtag = heuteISO()) {
   return {
     monate,
     abMonat: o.kaufdatum ? o.kaufdatum.slice(0, 7) : null,
-    bis: stichtag.slice(0, 7),
+    bis: letzterMonat(stichtag),
     jahre: bisJahr - kaufjahr + 1,
     kumuliertVorSteuer: vor,
-    kumuliertNachSteuer: nach,
+    // Erwartete Steuerwirkung, noch nicht geflossen – siehe oben.
+    steuerwirkung,
+    kumuliertNachSteuer: vor + steuerwirkung,
     eingesetzt,
     gebundenVorSteuer: eingesetzt - vor,
-    gebundenNachSteuer: eingesetzt - nach,
+    gebundenNachSteuer: eingesetzt - vor - steuerwirkung,
   };
 }
 

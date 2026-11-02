@@ -277,8 +277,10 @@ function kapitalKarte(o) {
   const z = objektKennzahlen(o);
   const kb = kapitalbindung(o);
   const nach = steuerModus() === 'nach';
-  const kumuliert = nach ? kb.kumuliertNachSteuer : kb.kumuliertVorSteuer;
-  const gebunden = nach ? kb.gebundenNachSteuer : kb.gebundenVorSteuer;
+  /* Geflossen heißt geflossen – die erwartete Steuerwirkung steht als
+     eigene Zeile darunter, siehe dashboard.js. */
+  const kumuliert = kb.kumuliertVorSteuer;
+  const gebunden = kb.gebundenVorSteuer;
 
   const zeile = (label, wert, art, unter) => el('tr', {}, [
     el('td', {}, [
@@ -310,8 +312,12 @@ function kapitalKarte(o) {
             kb.monate ? `Geflossene Cashflows (${kb.monate} ${kb.monate === 1 ? 'Monat' : 'Monate'})` : 'Geflossene Cashflows',
             kb.monate ? kumuliert : 0, null,
             kb.monate
-              ? `${monatKurz(kb.abMonat)} – ${monatKurz(kb.bis)} · ${nach ? 'nach Steuern' : 'vor Steuern'}`
+              ? `${monatKurz(kb.abMonat)} – ${monatKurz(kb.bis)} · tatsächlich gezahlt`
               : 'noch nichts geflossen, der Kauf steht bevor'),
+          ...(nach && Math.abs(kb.steuerwirkung) > 0.5 ? [
+            zeile('Erwartete Steuerwirkung', kb.steuerwirkung, null,
+              'noch nicht geflossen · kommt mit der Veranlagung'),
+          ] : []),
           zeile('Heute gebundenes Kapital', gebunden, 'summe',
             kumuliert < 0 ? 'Zuschüsse erhöhen das gebundene Kapital' : 'Überschüsse haben Kapital zurückgeführt'),
         ])]),
@@ -332,7 +338,7 @@ function kapitalKarte(o) {
         ])]),
       ]),
       el('div.hint', { style: 'margin-top:12px', text:
-        'Gezählt wird nur bis zum laufenden Monat – künftige Monate des Kalenderjahres bleiben außen vor, '
+        'Gezählt werden nur abgeschlossene Monate – der laufende und künftige bleiben außen vor, '
         + 'anders als in der Cashflow-Tabelle oben. Die Werte sind überschlägig: Mieten und Zinsen stammen '
         + 'aus den erfassten Konditionen und dem Tilgungsplan, laufende Kosten und Steuersatz werden mit den '
         + 'heutigen Werten gerechnet.' }),

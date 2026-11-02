@@ -343,11 +343,17 @@ verschiedene Fragen:
   Kalenderjahre. Im laufenden Jahr stecken darin auch die Monate, die noch kommen. Sie
   beantworten: *Was bringt das Jahr insgesamt?*
 - Die Kachel **Geflossener Cashflow** und die Zeile *Geflossene Cashflows* in der Objektansicht
-  zählen dagegen nur bis zum laufenden Monat. Sie beantworten: *Was ist bisher wirklich
+  zählen dagegen nur **abgeschlossene** Monate. Sie beantworten: *Was ist bisher wirklich
   geflossen?* Steht der Kauf noch bevor, steht dort null mit dem Vermerk „noch nichts geflossen".
 
 Zum Jahresende laufen beide Zahlen wieder zusammen. Die Steuer wird in der Geflossen-Rechnung
-zeitanteilig angesetzt, obwohl sie tatsächlich erst mit der Veranlagung fließt.
+getrennt ausgewiesen: Eine Erstattung auf die Verluste dieses Jahres fließt frühestens
+mit der Veranlagung im nächsten. Eine Zahl, die „geflossen" heißt, enthält sie deshalb
+nicht – sie steht als eigene Kachel *Erwartete Steuerwirkung* daneben.
+
+Ebenso zählt der **laufende Monat nicht mit**: Am 2. November ist der November noch nicht
+bezahlt, und ihn voll anzusetzen hieße, Kosten und Abschreibung für einen Monat zu buchen,
+der gerade erst begonnen hat.
 
 **Alles ist ein Kalenderjahr.** Miete, Zinsen, Tilgung und AfA werden für das jeweilige Jahr
 monatsgenau angesetzt. Im Anschaffungsjahr sind das entsprechend weniger als zwölf Monate –

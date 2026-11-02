@@ -50,7 +50,11 @@ const monatKurz = (p) => (p ? `${p.slice(5, 7)}/${p.slice(0, 4)}` : '–');
 
 function kennzahlen(p, folge, nach, kb) {
   const cfFolge = nach ? folge.cashflowNachSteuer : folge.cashflowVorSteuer;
-  const kumuliert = nach ? kb.kumuliertNachSteuer : kb.kumuliertVorSteuer;
+  /* „Geflossen" heißt geflossen: nur tatsächliche Zahlungen. Die erwartete
+     Steuerwirkung steht als eigene Kachel daneben – eine Erstattung auf die
+     Verluste dieses Jahres kommt frühestens mit der Veranlagung im
+     nächsten und gehört nicht in eine Ist-Zahl. */
+  const kumuliert = kb.kumuliertVorSteuer;
   const ekRendite = nach ? p.ekRenditeCashflow : p.ekRenditeVorSteuer;
   const ekRenditeGesamt = nach ? p.ekRenditeGesamt : p.ekRenditeGesamtVorSteuer;
 
@@ -70,10 +74,16 @@ function kennzahlen(p, folge, nach, kb) {
     })(),
     kb.monate
       ? kachel('Geflossener Cashflow', eur(kumuliert, 0),
-          `${monatKurz(kb.abMonat)} – ${monatKurz(kb.bis)} · ${kb.monate} ${kb.monate === 1 ? 'Monat' : 'Monate'} · ${nach ? 'nach' : 'vor'} Steuern`,
+          `${monatKurz(kb.abMonat)} – ${monatKurz(kb.bis)} · ${kb.monate} ${kb.monate === 1 ? 'Monat' : 'Monate'} · tatsächlich gezahlt`,
           kumuliert >= 0 ? 'pos' : 'neg')
       : kachel('Geflossener Cashflow', eur(0, 0),
           kb.abMonat ? `noch nichts geflossen · Kauf ab ${monatKurz(kb.abMonat)}` : 'noch nichts geflossen'),
+    /* Nur im Nachsteuer-Modus und nur, wenn es etwas zu zeigen gibt. */
+    ...(nach && Math.abs(kb.steuerwirkung) > 0.5 ? [
+      kachel('Erwartete Steuerwirkung',
+        (kb.steuerwirkung >= 0 ? '+' : '') + eur(kb.steuerwirkung, 0),
+        'noch nicht geflossen · kommt mit der Veranlagung'),
+    ] : []),
     kachel(`Cashflow ${folge.jahr} / Monat`, eur(cfFolge / 12, 0),
       `${eur(cfFolge, 0)} im Jahr ${folge.jahr}`, cfFolge >= 0 ? 'pos' : 'neg'),
     kachel('Kaltmiete / Monat', eur(p.kaltmieteMonat, 0),
@@ -143,7 +153,9 @@ function cashflowJahre(p, folge, nach) {
       hinweisText ? el('div.hint', { style: 'margin-top:14px', text: hinweisText }) : null,
       el('div.hint', { style: 'margin-top:6px', text:
         'Die Spalten oben sind Kalenderjahre und enthalten auch die Monate, die im laufenden Jahr noch '
-        + 'kommen. Die Kachel „Geflossener Cashflow" zählt dagegen nur bis zum laufenden Monat. Mieten und '
+        + 'kommen. Die Kachel „Geflossener Cashflow" zählt dagegen nur abgeschlossene Monate und nur '
+        + 'tatsächliche Zahlungen – die erwartete Steuerwirkung steht daneben, weil sie erst mit der '
+        + 'Veranlagung fließt. Mieten und '
         + 'Zinsen stammen aus den erfassten Konditionen und dem Tilgungsplan; für laufende Kosten und '
         + 'Steuersatz werden die heutigen Werte auch auf die Vorjahre angewendet, die Steuer wird '
         + 'zeitanteilig angesetzt.' }),
