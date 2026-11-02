@@ -209,6 +209,7 @@ werden bewusst nicht verglichen; die laufen auf zwei Geräten ohnehin auseinande
 | 12 | Touch-Bedienung fürs iPad | fertig |
 | 13 | Spekulationsfrist, offene § 82b-Verteilungen, Soll/Ist bei den Mieten | fertig |
 | 14 | Mieterhöhungsspielraum nach § 558 BGB | fertig |
+| 15 | Staffel- und Indexmiete im Vertrag, mit Erinnerung an den Mieter | fertig |
 
 ## Aufbau des Codes
 
@@ -459,6 +460,36 @@ der Gliederung der Anlage V – je Objekt und fürs ganze Portfolio, exportierba
   Frist eine Orientierung und kein Freibrief.
 - **Ein Verkauf vor Ablauf einer § 82b-Verteilung** lässt den Restbetrag in einer Summe
   abziehbar werden. Die App kennt keinen Verkaufsvorgang und rechnet das nicht.
+
+**Staffel- und Indexmiete.** Unter *Vertragsdaten* legst du fest, was vereinbart ist. Die
+Karte *Mietanpassung* zeigt danach jeweils etwas anderes – die drei Fälle haben rechtlich
+wenig gemeinsam.
+
+**Staffelmiete (§ 557a BGB).** Über *Staffeln erzeugen* in den Mietkonditionen legst du alle
+Stufen in einem Zug an: erste Staffel, Abstand, Erhöhung als Betrag oder Prozentsatz, Anzahl.
+Die Vorschau rechnet mit, bevor etwas gespeichert wird. Die Staffeln landen als gewöhnliche
+Konditionen in der Zeitreihe – es gibt keine zweite Liste daneben, die davon abweichen
+könnte. Weil § 557a den Ausweis **als Geldbetrag** verlangt, wird ein Prozentsatz sofort in
+Beträge umgerechnet; jede Staffel muss mindestens ein Jahr gelten, kürzere Abstände lehnt die
+App ab.
+
+> **Die Stufe greift von selbst** – eine Erklärung braucht es nicht. Trotzdem erinnert die App
+> 90 Tage vorher daran, den Mieter zu informieren: Sonst läuft sein Dauerauftrag weiter auf
+> den alten Betrag, und es entsteht ein Rückstand, den niemand gewollt hat.
+
+**Indexmiete (§ 557b BGB).** Du trägst den Verbraucherpreisindex ein, auf dem die heutige
+Miete beruht. Gibst du später den aktuellen Indexstand ein, rechnet die App die neue Miete,
+die Veränderung in Prozent und den frühesten Wirksamkeitstermin aus und trägt sie auf Wunsch
+als Mietanpassung ein.
+
+> **Hier greift nichts von selbst.** Nach § 557b Abs. 3 BGB wird die Erhöhung erst durch eine
+> **Erklärung in Textform** wirksam, in der die eingetretene Indexänderung und die neue Miete
+> als Geldbetrag stehen – geschuldet ist sie ab Beginn des **übernächsten** Monats nach
+> Zugang. Ohne diese Erklärung bleibt die alte Miete geschuldet. Das ist keine Höflichkeit,
+> sondern Wirksamkeitsvoraussetzung, und die App weist bei jedem Schritt darauf hin.
+
+Bei beiden Formen sind Erhöhungen nach § 558 (Vergleichsmiete) daneben ausgeschlossen. Die
+App verfasst **keine Schreiben** – sie rechnet die Beträge und erinnert an die Fristen.
 
 **Mieterhöhung.** Jeder Mietvertrag zeigt den Spielraum bis zur ortsüblichen
 Vergleichsmiete nach § 558 BGB. Drei Schranken gelten gleichzeitig:

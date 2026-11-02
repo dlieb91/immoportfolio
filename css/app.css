@@ -893,3 +893,11 @@ body.touch table.data td select { min-height: 38px; font-size: 16px; }
    soll die Zeile nicht einfärben. */
 .icon-mini.warnend { color: var(--warn); border-color: var(--warn); font-weight: 700; }
 .icon-mini.bestaetigt { color: var(--pos); border-color: var(--pos); }
+
+/* Erinnerung an eine Mietanpassung: dieselbe Form wie .note, aber in der
+   Warnfarbe – eine versäumte Erklärung kostet bare Miete. */
+.note.note-warn {
+  background: color-mix(in srgb, var(--warn) 12%, transparent);
+  border-color: color-mix(in srgb, var(--warn) 40%, transparent);
+}
+.note.note-warn .note-icon { color: var(--warn); }

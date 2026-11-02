@@ -7,7 +7,7 @@ import {
 } from '../kennzahlen.js';
 import { prognose, basisParameter } from '../forecast.js';
 import { erhaltungsAmpel, spekulationsfrist } from '../buchhaltung.js';
-import { erhoehbareVertraege } from '../mieterhoehung.js';
+import { erhoehbareVertraege, anstehendeAnpassungen } from '../mieterhoehung.js';
 import { speicher } from '../storage.js';
 
 export const dashboard = {
@@ -389,6 +389,26 @@ function warnungen() {
         ? `offen seit ${monatKurz(pk.rueckstandSeit)} · zählt weder im Cashflow noch als Einnahme`
         : 'zählt weder im Cashflow noch als Einnahme',
     });
+  }
+
+  /* Vereinbarte Anpassungen: Staffel und Index. Beide erinnern an die
+     Mitteilung an den Mieter – bei der Indexmiete ist sie sogar
+     Wirksamkeitsvoraussetzung, bei der Staffel verhindert sie nur einen
+     Rueckstand aus einem weiterlaufenden Dauerauftrag. */
+  for (const a of anstehendeAnpassungen(heute)) {
+    const name = a.mv.mieter || 'ohne Mieter';
+    punkte.push(a.art === 'index'
+      ? {
+          art: 'warn', ziel: `#/mietvertrag?id=${a.mv.id}`,
+          text: `Indexanpassung möglich: ${name}`,
+          detail: 'wird erst durch Erklärung in Textform wirksam (§ 557b Abs. 3 BGB) – '
+            + 'ohne sie bleibt die alte Miete geschuldet',
+        }
+      : {
+          art: 'info', ziel: `#/mietvertrag?id=${a.mv.id}`,
+          text: `Staffel in ${a.tage} Tagen: ${name} · ${eur(a.alteMiete, 0)} → ${eur(a.neueMiete, 0)}`,
+          detail: `ab ${datum(a.datum)} · den Mieter rechtzeitig informieren, damit der Dauerauftrag stimmt`,
+        });
   }
 
   /* Mieterhöhungen, deren Sperrfrist abgelaufen ist oder bald abläuft.

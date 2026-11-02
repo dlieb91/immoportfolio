@@ -9,7 +9,7 @@ import { uid, zeitstempel, heuteISO } from './util.js';
 import { planeSpeichern } from './storage.js';
 import { tilgungsplan } from './finanzmathematik.js';
 
-export const SCHEMA_VERSION = 12;
+export const SCHEMA_VERSION = 13;
 
 export const STANDARD_EINSTELLUNGEN = {
   // Steuern
@@ -292,6 +292,16 @@ export function migrieren(daten) {
     daten.schemaVersion = 12;
   }
 
+  if (v < 13) {
+    // Staffel- und Indexvereinbarung im Vertrag. Ohne Wirkung, bis gefuellt.
+    for (const mv of daten.mietvertraege || []) {
+      if (mv.indexBasisStand === undefined) mv.indexBasisStand = null;
+      if (mv.indexBasisDatum === undefined) mv.indexBasisDatum = null;
+      if (mv.staffelRhythmusMonate === undefined) mv.staffelRhythmusMonate = 12;
+    }
+    daten.schemaVersion = 13;
+  }
+
   const basis = neuesPortfolio(daten.meta?.name);
   const zusammen = {
     ...basis,
@@ -439,6 +449,15 @@ export function neuerMietvertrag(einheitId, beginn = heuteISO()) {
     kaution: null,
     anpassungTyp: 'keine',        // keine | staffel | index
     indexProzent: null,           // angenommene Anpassung p. a. bei Indexmiete
+    /* Indexmiete: der Verbraucherpreisindex, auf dem die aktuell geltende
+       Miete fuszt. Daraus rechnet die App die naechste Anpassung aus – den
+       aktuellen Indexstand holt man beim Statistischen Bundesamt. */
+    indexBasisStand: null,
+    indexBasisDatum: null,
+    /* Staffelmiete: Gedaechtnis des Erzeugers. Die Staffeln selbst stehen
+       als Konditionen in der Zeitreihe oben – eine zweite Liste waere eine
+       zweite Wahrheit ueber dieselbe Miete. */
+    staffelRhythmusMonate: 12,
     notizen: '',
   };
 }
