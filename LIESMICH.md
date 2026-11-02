@@ -237,6 +237,7 @@ werden bewusst nicht verglichen; die laufen auf zwei Geräten ohnehin auseinande
 | 15 | Staffel- und Indexmiete im Vertrag, mit Erinnerung an den Mieter | fertig |
 | 16 | Druckansicht für Objektblatt, Anlage V und Forecast | fertig |
 | 17 | Anhang zur Anlage V: Herleitung der Werbungskosten | fertig |
+| 18 | Erhaltungsrücklage steuerlich neutral (BFH IX R 19/24) | fertig |
 
 ## Aufbau des Codes
 
@@ -491,6 +492,19 @@ kein Ersatz für die formelle, rechtssichere Abrechnung.
 
 **Steuerjahr.** Eigener Menüpunkt mit einer Aufstellung der Einnahmen und Werbungskosten in
 der Gliederung der Anlage V – je Objekt und fürs ganze Portfolio, exportierbar als CSV.
+**Die Erhaltungsrücklage ist kein Werbungskostenabzug.** Einzahlungen in die Rücklage
+einer Wohnungseigentümergemeinschaft mindern den Cashflow – das Geld ist weg – aber **nicht
+die Einkünfte**. Abziehbar werden sie erst, wenn die Gemeinschaft das Geld tatsächlich
+verausgabt (BFH, Urteil vom 14.01.2025, IX R 19/24). Der Grund ist einleuchtend: Vorher lässt
+sich gar nicht beurteilen, ob daraus sofort abziehbarer Erhaltungsaufwand oder nur über die
+AfA wirkender Herstellungsaufwand wird.
+
+Die App trennt das deshalb sauber: Das Feld *Erhaltungsrücklage* am Objekt fließt in den
+Cashflow, bleibt aber aus Anlage V, Einkünften und Steuer heraus – in der Ist-Rechnung, in
+der Runrate und im Forecast gleichermaßen. **Sobald die Gemeinschaft das Geld ausgibt**,
+erfasst du den Betrag als Buchung der Kategorie *Erhaltungsaufwand*; dann greift er, mit
+allen Folgen aus § 82b EStDV und der 15-%-Grenze.
+
 **Anhang: Herleitung der Werbungskosten.** Je Objekt schließt eine Karte die Aufstellung
 ab, die zeigt, woraus jede Position entstanden ist – und zwar aus denselben Quellen, aus
 denen die Summen gebildet werden. Beide stimmen deshalb auf den Cent überein.

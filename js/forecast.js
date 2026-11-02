@@ -216,7 +216,10 @@ export function prognose(params, stichtag = heuteISO(), objektIds = null) {
       const afa = afaImJahr(o, jahr);
 
       /* --- Steuer --- */
-      const einkuenfte = miete - bewirtschaftung - instandhaltung - zins - afa;
+      /* Die Instandhaltungsrücklage mindert den Cashflow, aber nicht die
+         Einkünfte – abziehbar wird sie erst bei Verausgabung durch die
+         Gemeinschaft (BFH IX R 19/24). Siehe kennzahlen.js. */
+      const einkuenfte = miete - bewirtschaftung - zins - afa;
       const steuer = einkuenfte * steuersatzFuer(o, params) / 100;
 
       if (anteil > 0 && anteil < 1) zeile.rumpfjahr = true;

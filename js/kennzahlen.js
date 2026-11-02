@@ -218,7 +218,9 @@ export function objektKennzahlen(o, stichtag = heuteISO()) {
      sonstige) mindern beides gleichermassen. */
   const afa = afaWerte(o);
   const afaJahr = afaImJahr(o, jahr);
-  const werbungskosten = bewirtschaftung + ist.betriebskostenUmlagefaehig
+  /* Ohne die Erhaltungsrücklage: Ihre Einzahlung ist keine Werbungskosten,
+     erst die Verausgabung durch die Gemeinschaft (BFH IX R 19/24). */
+  const werbungskosten = ist.bewirtschaftungSteuerlich + ist.betriebskostenUmlagefaehig
     + zins + afaJahr + ist.werbungskostenFrei;
   const einkuenfte = ist.miete + ist.umlagen - werbungskosten;
   const steuersatz = effektiverSteuersatz(o);
@@ -248,7 +250,9 @@ export function objektKennzahlen(o, stichtag = heuteISO()) {
   const mieteVereinbart = mieteVereinbartObjekt(o.id, stichtag);
   const kaltmieteRunrate = mieteVereinbart.kalt * 12;
   const cashflowRunrate = kaltmieteRunrate - bewirtschaftungVoll - kapitaldienst12;
-  const einkuenfteRunrate = kaltmieteRunrate - bewirtschaftungVoll - zins12 - afa.afaJahr;
+  // Auch hier ohne die Ruecklage – siehe werbungskosten oben (BFH IX R 19/24).
+  const einkuenfteRunrate = kaltmieteRunrate - (bewirtschaftungVoll - instandhaltungVoll)
+    - zins12 - afa.afaJahr;
   const steuerRunrate = einkuenfteRunrate * steuersatz / 100;
   const cashflowRunrateNachSteuer = cashflowRunrate - steuerRunrate;
 
@@ -407,7 +411,8 @@ export function kapitalbindung(o, stichtag = heuteISO()) {
     // Cashflow aussen vor, zaehlen aber in den Einkuenften; frei erfasste
     // Werbungskosten mindern beides.
     const cfVor = ist.miete - ist.bewirtschaftung - ist.werbungskostenFrei - ist.kapitaldienst;
-    const einkuenfte = ist.miete + ist.umlagen - ist.bewirtschaftung - ist.betriebskostenUmlagefaehig
+    const einkuenfte = ist.miete + ist.umlagen - ist.bewirtschaftungSteuerlich
+      - ist.betriebskostenUmlagefaehig
       - ist.zins - ist.werbungskostenFrei - afaImJahr(o, j, grenze);
     vor += cfVor;
     /* Getrennt gefuehrt, nicht eingerechnet: Eine Erstattung auf Verluste

@@ -1561,7 +1561,8 @@ function blattKern(jahr) {
         [OJ.afa]: f(`IF(OR(${idx('ObjAfaDauer')}=0,${idx('ObjAfaJahr')}=0,${j}<${idx('ObjKaufJahr')},`
           + `${j}>=${idx('ObjKaufJahr')}+${idx('ObjAfaDauer')}),0,`
           + `IF(${j}=${idx('ObjKaufJahr')},${idx('ObjAfaJahr')}*(13-${idx('ObjKaufMonat')})/12,${idx('ObjAfaJahr')}))`),
-        [OJ.einkuenfte]: f(`${c(OJ.miete)}-${c(OJ.bewirt)}-${c(OJ.instand)}-${c(OJ.zins)}-${c(OJ.afa)}`),
+        // Rücklage bleibt aussen vor, siehe I.werbung oben.
+        [OJ.einkuenfte]: f(`${c(OJ.miete)}-${c(OJ.bewirt)}-${c(OJ.zins)}-${c(OJ.afa)}`),
         [OJ.steuer]: f(`${c(OJ.einkuenfte)}*${idx('ObjSteuersatz')}/100`),
         [OJ.kapitaldienst]: f(`${c(OJ.zins)}+${c(OJ.tilgung)}+${c(OJ.sonder)}+${c(OJ.ersatz)}`),
         [OJ.cfVor]: f(`${c(OJ.miete)}-${c(OJ.bewirt)}-${c(OJ.instand)}-${c(OJ.kapitaldienst)}`),
@@ -1634,7 +1635,9 @@ function blattKern(jahr) {
       /* Umlagefaehige Betriebskosten sind Werbungskosten, die Umlagen
          (istNk) die Gegen-Einnahme – wie kennzahlen.js:objektKennzahlen().
          Fuer den Cashflow (cfVor unten) bleiben beide aussen vor. */
-      [I.werbung]: f(`${c(I.istBewirt)}+${c(I.istUmlage)}+${c(I.istZins)}+${c(I.afaJahr)}`),
+      // Ohne Erhaltungsrücklage (istInstand): keine Werbungskosten bei
+      // Einzahlung, erst bei Verausgabung – BFH IX R 19/24.
+      [I.werbung]: f(`${c(I.istBewirt)}-${c(I.istInstand)}+${c(I.istUmlage)}+${c(I.istZins)}+${c(I.afaJahr)}`),
       [I.einkuenfte]: f(`${c(I.istMiete)}+${c(I.istNk)}-${c(I.werbung)}`),
       [I.steuersatz]: f(idx('ObjSteuersatz')),
       [I.steuer]: f(`${c(I.einkuenfte)}*${c(I.steuersatz)}/100`),
@@ -1643,7 +1646,9 @@ function blattKern(jahr) {
 
       /* Laufende zwoelf Monate – Grundlage aller Verhaeltniszahlen */
       [I.cfRunrate]: f(`${c(I.runrate)}-${c(I.bewirtVoll)}-${c(I.kapital12)}`),
-      [I.einkRunrate]: f(`${c(I.runrate)}-${c(I.bewirtVoll)}-${c(I.zins12)}-${c(I.afaVoll)}`),
+      // Ohne die Erhaltungsrücklage: ObjBewirt enthält sie mit zwölf Monaten,
+      // hier wird genau dieser Anteil wieder herausgerechnet.
+      [I.einkRunrate]: f(`${c(I.runrate)}-(${c(I.bewirtVoll)}-${idx('ObjInstand')}*12)-${c(I.zins12)}-${c(I.afaVoll)}`),
       [I.steuerRunrate]: f(`${c(I.einkRunrate)}*${c(I.steuersatz)}/100`),
       [I.cfRunrateNach]: f(`${c(I.cfRunrate)}-${c(I.steuerRunrate)}`),
 

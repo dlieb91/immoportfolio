@@ -37,7 +37,10 @@ export const steuerjahr = {
     inner.append(hinweis(
       'Zuarbeit fürs Finanzamt oder den Steuerberater, <strong>keine Steuerberatung</strong>. '
       + 'Die Zuordnung zur Anlage V ist vereinfacht; Grenzfälle wie die 15-%-Grenze anschaffungsnaher '
-      + 'Herstellungskosten oder die Verteilung nach § 82b EStDV gehören in fachkundige Hände.'
+      + 'Herstellungskosten oder die Verteilung nach § 82b EStDV gehören in fachkundige Hände. '
+      + '<strong>Die Erhaltungsrücklage ist nicht enthalten</strong> – Einzahlungen sind erst abziehbar, '
+      + 'wenn die Gemeinschaft das Geld verausgabt (BFH IX R 19/24). Erfasse den Betrag dann als '
+      + 'Buchung der Kategorie „Erhaltungsaufwand“.'
     ));
     inner.append(aufstellungKarte('Portfolio gesamt', portfolio));
     for (const o of state.daten.objekte) {

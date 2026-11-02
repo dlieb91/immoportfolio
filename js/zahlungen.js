@@ -55,7 +55,13 @@ export const KATEGORIEN = [
   { key: 'sonstige', text: 'Sonstige Kosten', gruppe: 'Betriebskosten', vorzeichen: -1, abgeleitet: true, steuerlich: true, anlageV: 'Werbungskosten: Betriebskosten' },
   // Erhaltung – eigene Gruppe wegen 15-%-Grenze und § 82b, siehe buchhaltung.js
   { key: 'erhaltung', text: 'Erhaltungsaufwand / Reparatur', gruppe: 'Erhaltung', vorzeichen: -1, steuerlich: true, anlageV: 'Werbungskosten: Erhaltungsaufwand' },
-  { key: 'instandhaltung', text: 'Instandhaltungsrücklage', gruppe: 'Erhaltung', vorzeichen: -1, abgeleitet: true, steuerlich: true, anlageV: 'Werbungskosten: Erhaltungsaufwand' },
+  /* Zahlungen in die Erhaltungsrücklage sind **keine** Werbungskosten im Jahr
+     der Einzahlung (BFH IX R 19/24 vom 14.01.2025). Abziehbar werden sie erst,
+     wenn die Gemeinschaft das Geld tatsächlich verausgabt – vorher lässt sich
+     gar nicht beurteilen, ob daraus sofort abziehbarer Erhaltungsaufwand oder
+     nur über die AfA wirkender Herstellungsaufwand wird. Im Cashflow steht die
+     Zahlung trotzdem, denn das Geld ist weg. */
+  { key: 'instandhaltung', text: 'Erhaltungsrücklage', gruppe: 'Erhaltung', vorzeichen: -1, abgeleitet: true, steuerlich: false },
   // Sonstige Werbungskosten
   { key: 'fahrtkosten', text: 'Fahrtkosten', gruppe: 'Sonstige Werbungskosten', vorzeichen: -1, steuerlich: true, anlageV: 'Werbungskosten: Fahrtkosten' },
   { key: 'steuerberatung', text: 'Steuerberatung', gruppe: 'Sonstige Werbungskosten', vorzeichen: -1, steuerlich: true, anlageV: 'Werbungskosten: Sonstiges' },
@@ -393,6 +399,10 @@ function jahresSummenRechnen(objektId, jahr, bisMonat) {
   // die frei erfassten, immer landlordseitig getragenen Positionen.
   summe.bewirtschaftung = summe.hausgeld + summe.verwaltung + summe.instandhaltung
     + summe.sonstige + summe.grundsteuer + summe.versicherung;
+  /* Dasselbe ohne die Erhaltungsrücklage – sie mindert den Cashflow, aber
+     nicht die Einkünfte (BFH IX R 19/24). Zwei Groessen, weil hier genau
+     zwei verschiedene Fragen beantwortet werden. */
+  summe.bewirtschaftungSteuerlich = summe.bewirtschaftung - summe.instandhaltung;
   summe.kapitaldienst = summe.zins + summe.tilgung + summe.sondertilgung + summe.tilgungsersatz;
   // Frei erfasste Werbungskosten ausserhalb der laufenden Bewirtschaftung –
   // mindern Cashflow wie Einkuenfte gleichermassen.

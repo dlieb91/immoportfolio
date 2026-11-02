@@ -198,7 +198,8 @@ function cashflowKarte(o) {
         : `${eur(z.kaltmieteMonat, 0)} pro Monat`),
     z.hausgeldNichtUmlagefaehig ? zeile('Hausgeld nicht umlagefähig', z.hausgeldNichtUmlagefaehig, 'abzug') : null,
     z.verwaltung ? zeile('Verwaltung', z.verwaltung, 'abzug') : null,
-    z.instandhaltung ? zeile('Instandhaltung', z.instandhaltung, 'abzug') : null,
+    z.instandhaltung ? zeile('Erhaltungsrücklage', z.instandhaltung, 'abzug',
+      'mindert den Cashflow, nicht die Steuer') : null,
     z.sonstige ? zeile('Sonstige Kosten', z.sonstige, 'abzug') : null,
     z.grundsteuer ? zeile('Grundsteuer', z.grundsteuer, 'abzug') : null,
     z.versicherung ? zeile('Versicherung', z.versicherung, 'abzug') : null,
@@ -1026,6 +1027,10 @@ function kostenKarte(o, kennzahlenNeu) {
       instandHinweis.textContent = `pro Monat, leer · der Forecast rechnet mit ${eur(pauschale, 0)} `
         + `pro Jahr (${num(prozent, 2)} % vom Kaufpreis aus den Annahmen)`;
     }
+    /* Der steuerliche Hinweis gilt unabhaengig davon, ob ein Betrag steht –
+       er erklaert, warum die Rücklage in der Anlage V nicht auftaucht. */
+    instandHinweis.textContent += ' · steuerlich erst abziehbar, wenn die Gemeinschaft '
+      + 'das Geld verausgabt (BFH IX R 19/24)';
     summeWert.textContent = eur(summe, 0) + ' / Jahr';
   };
 
@@ -1041,9 +1046,9 @@ function kostenKarte(o, kennzahlenNeu) {
       ]),
       zahlFeld('Verwaltung', k, 'verwaltungMonat', { ...b, suffix: '€', hint: 'pro Monat' }),
       el('div.field', {}, [
-        el('label', { text: 'Instandhaltung' }),
+        el('label', { text: 'Erhaltungsrücklage' }),
         el('div.input-suffix', {}, [
-          zahlEingabe(k, 'instandhaltungMonat', { ...b, label: 'Instandhaltung' }),
+          zahlEingabe(k, 'instandhaltungMonat', { ...b, label: 'Erhaltungsrücklage' }),
           el('span', { text: '€' }),
         ]),
         instandHinweis,
