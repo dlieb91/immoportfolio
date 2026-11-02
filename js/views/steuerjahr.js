@@ -6,7 +6,9 @@
 
 import { el, leeren, eur, num, toast, csvZeile, datum, druckKnopf } from '../util.js';
 import { state } from '../store.js';
-import { anlageVPortfolio, anlageVAufstellung, verteilungenOffen } from '../buchhaltung.js';
+import {
+  anlageVPortfolio, anlageVAufstellung, verteilungenOffen, werbungskostenHerleitung,
+} from '../buchhaltung.js';
 import { hinweis } from '../felder.js';
 
 let jahr = new Date().getFullYear();
@@ -47,6 +49,14 @@ export const steuerjahr = {
     }
     const verteilung = verteilungsKarte(jahr);
     if (verteilung) inner.append(verteilung);
+
+    /* Der Anhang schließt die Aufstellung ab: Er zeigt, woraus jede
+       Werbungskostenposition entstanden ist. Auf Papier beginnt er auf
+       einer neuen Seite. */
+    for (const o of state.daten.objekte) {
+      const anhang = herleitungsKarte(o, jahr);
+      if (anhang) inner.append(anhang);
+    }
   },
 };
 
@@ -184,4 +194,88 @@ function exportieren(portfolio) {
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 5000);
   toast('CSV exportiert', 'ok');
+}
+
+
+/* ---------- Anhang: Herleitung der Werbungskosten ---------- */
+
+/**
+ * Zeigt je Position, woraus sie entstanden ist.
+ *
+ * Die Aufstellung oben nennt nur Summen; wer sie prüfen soll, braucht den
+ * Weg dahin. Die Beträge stammen aus werbungskostenHerleitung() und decken
+ * sich auf den Cent mit der Aufstellung – das ist der ganze Zweck.
+ */
+function herleitungsKarte(o, jahr) {
+  const positionen = werbungskostenHerleitung(o, jahr);
+  if (!positionen.length) return null;
+
+  const summe = positionen.reduce((s, x) => s + x.betrag, 0);
+
+  const zeile = (text, zusatz, betrag, stark) => el('tr', {}, [
+    el('td', {}, [
+      el('span', { text, style: stark ? 'font-weight:600' : '' }),
+      zusatz ? el('div.faint', { text: zusatz, style: 'font-size:11.5px;margin-top:1px' }) : null,
+    ]),
+    el('td.num', { text: betrag == null ? '' : eur(betrag), style: stark ? 'font-weight:600' : '' }),
+  ]);
+
+  const block = (pos) => {
+    const zeilen = [];
+
+    if (pos.art === 'afa') {
+      const r = pos.rechnung;
+      zeilen.push(zeile('Anschaffungskosten inkl. Nebenkosten', null, r.anschaffung));
+      zeilen.push(zeile('abzüglich Grundstücksanteil', null, -r.grundstueck));
+      if (r.modernisierung) zeilen.push(zeile('zuzüglich aktivierte Modernisierung', null, r.modernisierung));
+      zeilen.push(zeile('AfA-Bemessungsgrundlage', null, r.gebaeude, true));
+      zeilen.push(zeile(`Abschreibung ${num(r.satz, 3)} % pro Jahr`,
+        r.dauer ? `über ${num(r.dauer, 1)} Jahre` : null, r.afaVoll));
+      if (r.monate < 12) {
+        zeilen.push(zeile(`zeitanteilig ${r.monate} von 12 Monaten`,
+          'im Anschaffungsjahr ab dem Kaufmonat (§ 7 Abs. 1 S. 4 EStG)', null));
+      }
+    } else {
+      for (const x of pos.posten) {
+        zeilen.push(zeile(x.text, x.zusatz || x.hinweis || x.datum || null, -(x.betrag || 0)));
+      }
+    }
+
+    return el('div', { style: 'margin-bottom:14px' }, [
+      el('div', {
+        style: 'display:flex;justify-content:space-between;align-items:baseline;gap:12px;'
+          + 'padding:6px 0;border-bottom:1px solid var(--border)',
+      }, [
+        el('span', { text: pos.label, style: 'font-weight:600' }),
+        pos.art === 'hinweis'
+          ? el('span.badge', { text: 'nicht abziehbar' })
+          : el('span.num', { text: eur(pos.betrag), style: 'font-weight:600' }),
+      ]),
+      pos.text ? el('div.hint', { text: pos.text, style: 'margin:6px 0' }) : null,
+      el('table.data.kompakt', {}, [el('tbody', {}, zeilen)]),
+    ].filter(Boolean));
+  };
+
+  const karte = el('div.card.druck-neue-seite', {}, [
+    el('div.card-head', {}, [
+      el('div', {}, [
+        el('h2', { text: 'Anhang: Herleitung der Werbungskosten' }),
+        el('div.sub', { text: `${o.bezeichnung || 'Ohne Bezeichnung'} · ${jahr}` }),
+      ]),
+      el('span.num', { text: eur(summe), style: 'font-weight:600' }),
+    ]),
+    el('div.card-body', {}, [
+      ...positionen.map(block),
+      el('div', {
+        style: 'display:flex;justify-content:space-between;gap:12px;padding-top:10px;'
+          + 'border-top:2px solid var(--border-strong);font-weight:600',
+      }, [
+        el('span', { text: 'Summe Werbungskosten' }),
+        el('span.num', { text: eur(summe) }),
+      ]),
+      hinweis('Die Summe stimmt mit der Aufstellung oben überein. Beträge ohne Vorzeichen in '
+        + 'der Herleitung sind Rechengrößen, keine Zahlungen.'),
+    ]),
+  ]);
+  return karte;
 }

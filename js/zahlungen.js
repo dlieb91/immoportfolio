@@ -378,11 +378,15 @@ function jahresSummenRechnen(objektId, jahr, bisMonat) {
   // Umlagen: vereinnahmte Vorauszahlung, Nachzahlung abzueglich Erstattung.
   summe.umlagen = summe.nebenkosten + summe.nkNachzahlung - summe.nkErstattung;
 
-  // Der Katalogeintrag "Sonstige Werbungskosten" ist zugleich der Sammelposten
-  // der ganzen Gruppe – erst hier zur Gruppensumme erweitert, damit die reine
-  // Kategorie in der Buchungsliste eigenstaendig bleibt.
-  const sonstigeWkKategorie = summe.sonstigeWk;
-  summe.sonstigeWk = sonstigeWkKategorie + summe.steuerberatung + summe.rechtsberatung
+  /* Die Gruppe "Sonstige Werbungskosten" bekommt eine eigene Summe – und
+     zwar unter eigenem Namen.
+
+     Frueher wurde summe.sonstigeWk dafuer ueberschrieben. Das war eine
+     Falle: Der Schluessel ist zugleich eine echte Kategorie des Katalogs,
+     und wer wie anlageVAufstellung() ueber alle KATEGORIEN laeuft, zaehlte
+     Steuerberatung, Buero und die uebrigen dann zweimal – einmal einzeln
+     und einmal in der Gruppensumme. Ein Name, eine Bedeutung. */
+  summe.sonstigeWkGesamt = summe.sonstigeWk + summe.steuerberatung + summe.rechtsberatung
     + summe.buero + summe.mitgliedsbeitrag + summe.kontofuehrung;
 
   // Nicht umlagefaehige Bewirtschaftung: die bestehenden Kostenfelder plus
@@ -392,7 +396,7 @@ function jahresSummenRechnen(objektId, jahr, bisMonat) {
   summe.kapitaldienst = summe.zins + summe.tilgung + summe.sondertilgung + summe.tilgungsersatz;
   // Frei erfasste Werbungskosten ausserhalb der laufenden Bewirtschaftung –
   // mindern Cashflow wie Einkuenfte gleichermassen.
-  summe.werbungskostenFrei = summe.erhaltung + summe.fahrtkosten + summe.sonstigeWk;
+  summe.werbungskostenFrei = summe.erhaltung + summe.fahrtkosten + summe.sonstigeWkGesamt;
   // Nettobewegung der steuerlich neutralen Posten (Kaution, Privatentnahme/-einlage).
   summe.neutral = summe.kautionErhalten - summe.kautionZurueck
     - summe.privatentnahme + summe.privateinlage;

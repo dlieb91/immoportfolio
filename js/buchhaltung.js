@@ -25,7 +25,7 @@ import {
   flaecheVon, einheitenVon, mieteEinheit, buchungenVon, fahrtenVon,
 } from './store.js';
 import {
-  KATEGORIEN, GRUPPEN, artInfo, zahlungsliste, jahresSummen, fahrtBetrag,
+  KATEGORIEN, GRUPPEN, artInfo, zahlungsliste, jahresSummen, fahrtBetrag, monatszahlungen,
 } from './zahlungen.js';
 import { afaWerte, afaImJahr } from './kennzahlen.js';
 
@@ -279,6 +279,202 @@ export function erhaltungSteuerlich(objektId, jahr) {
  * Steuerberatung – Grenzfälle wie die 15-%-Grenze oder § 82b EStDV bleiben
  * Sache des Steuerberaters.
  */
+/**
+ * Herleitung der Werbungskosten – zeigt, woraus jede Position der Anlage V
+ * entstanden ist.
+ *
+ * Die Aufstellung selbst nennt nur Summen. Wer sie prüfen soll – der
+ * Steuerberater, das Finanzamt, man selbst im nächsten Jahr – braucht den
+ * Weg dahin. Dieser Anhang liefert ihn aus **denselben Quellen**, aus denen
+ * anlageVAufstellung() seine Summen bildet; beides muss deshalb auf den Cent
+ * übereinstimmen, und genau das prüft die Testsammlung.
+ *
+ * Drei Arten von Positionen:
+ *   afa        – die Rechnung: Bemessungsgrundlage × Satz, zeitanteilig
+ *   erhaltung  – je Maßnahme, mit der Verteilung nach § 82b EStDV
+ *   posten     – die einzelnen Zahlungen, monatlich oder frei erfasst
+ */
+export function werbungskostenHerleitung(o, jahr) {
+  const raus = [];
+
+  /* --- Abschreibung --- */
+  const a = afaWerte(o);
+  const afaBetrag = afaImJahr(o, jahr);
+  if (afaBetrag) {
+    const monate = a.afaJahr ? Math.round(afaBetrag / a.afaJahr * 12) : 0;
+    raus.push({
+      label: 'Werbungskosten: AfA',
+      betrag: -afaBetrag,
+      art: 'afa',
+      rechnung: {
+        anschaffung: a.anschaffung,
+        grundstueck: a.grundstueck,
+        modernisierung: a.modernisierung,
+        gebaeude: a.gebaeude,
+        satz: o.afaSatz ?? 0,
+        dauer: a.afaDauer,
+        afaVoll: a.afaJahr,
+        monate,
+        betrag: afaBetrag,
+      },
+    });
+  }
+
+  /* --- Erhaltungsaufwand, steuerlich (§ 82b EStDV) --- */
+  const erhaltungPosten = [];
+  const aktiviert = [];
+  for (const b of buchungenVon(o.id)) {
+    if (b.kategorie !== 'erhaltung') continue;
+    const bJahr = Number((b.datum || '').slice(0, 4));
+    if (!bJahr) continue;
+    if (b.aktiviert) {
+      /* Aktiviert heisst: nicht sofort abziehbar, sondern über die AfA.
+         Das ist keine Werbungskostenposition – aber die Frage „wo sind
+         meine 25.000 € geblieben?" beantwortet der Anhang trotzdem, als
+         eigener Hinweis ausserhalb der Aufstellung. */
+      if (bJahr === jahr) aktiviert.push({ datum: b.datum, text: b.bezeichnung || 'Erhaltungsaufwand', betrag: b.betrag || 0 });
+      continue;
+    }
+    const jahre = b.verteilenJahre ? Math.min(5, Math.max(2, b.verteilenJahre)) : 1;
+    if (jahr < bJahr || jahr >= bJahr + jahre) continue;
+    erhaltungPosten.push({
+      datum: b.datum, text: b.bezeichnung || 'Erhaltungsaufwand',
+      gesamt: b.betrag || 0,
+      verteilenJahre: jahre > 1 ? jahre : null,
+      jahrVon: bJahr, jahrBis: bJahr + jahre - 1,
+      /* `betrag` heisst hier wie ueberall „was in diesem Jahr zaehlt" –
+         bei Verteilung also der Jahresanteil, nicht die Rechnungssumme.
+         Ein eigener Feldname brach die Darstellung, sobald Posten
+         verschiedener Herkunft in derselben Position landeten. */
+      betrag: (b.betrag || 0) / jahre,
+      hinweis: jahre > 1 ? `auf ${jahre} Jahre verteilt (§ 82b EStDV)` : null,
+    });
+  }
+  if (erhaltungPosten.length) {
+    const label = KATEGORIEN.find((k) => k.key === 'erhaltung').anlageV;
+    raus.push({
+      label, art: 'erhaltung', posten: erhaltungPosten,
+      betrag: -erhaltungPosten.reduce((s, x) => s + x.betrag, 0),
+    });
+  }
+  if (aktiviert.length) {
+    /* Kein Posten der Aufstellung – `art: 'hinweis'` sagt das der Ansicht
+       und hält die Deckungsprobe sauber. */
+    raus.push({
+      label: 'Aktivierter Erhaltungsaufwand', art: 'hinweis', posten: aktiviert,
+      betrag: 0,
+      text: 'In die AfA-Bemessungsgrundlage eingeflossen, nicht sofort abziehbar '
+        + '(anschaffungsnahe Herstellungskosten, § 6 Abs. 1 Nr. 1a EStG).',
+    });
+  }
+
+  /* --- Alle übrigen Werbungskosten: die einzelnen Zahlungen ---
+     Gesammelt wird aus derselben Quelle wie jahresSummen(): Monat für
+     Monat aus monatszahlungen(), dazu die frei erfassten Buchungen und
+     Fahrten. Erhaltungsaufwand bleibt aussen vor, er steht oben mit
+     seiner steuerlichen Verteilung. */
+  const eimer = new Map();
+  const dazu = (key, posten) => {
+    const k = KATEGORIEN.find((x) => x.key === key);
+    if (!k || !k.steuerlich || !k.anlageV || k.vorzeichen >= 0 || key === 'erhaltung') return;
+    if (!eimer.has(k.anlageV)) eimer.set(k.anlageV, []);
+    eimer.get(k.anlageV).push(posten);
+  };
+
+  // Monatliche, abgeleitete Zahlungen – je Kategorie zusammengefasst
+  const proKategorie = new Map();
+  for (let monat = 1; monat <= 12; monat++) {
+    for (const z of monatszahlungen(o, jahr, monat)) {
+      const wert = z.ist ?? z.betrag;
+      if (!wert) continue;
+      if (!proKategorie.has(z.art)) proKategorie.set(z.art, []);
+      proKategorie.get(z.art).push({ monat, betrag: wert, korrigiert: z.korrigiert, text: z.bezugText });
+    }
+  }
+  for (const [art, zeilen] of proKategorie) {
+    const betraege = zeilen.map((z) => z.betrag);
+    const gleich = betraege.every((b) => Math.abs(b - betraege[0]) < 0.005);
+    const summe = betraege.reduce((s, b) => s + b, 0);
+    if (gleich && !zeilen.some((z) => z.korrigiert)) {
+      // Regelfall: zwölf gleiche Monate – eine Zeile genügt.
+      dazu(art, {
+        text: `${zeilen.length} × ${betraege[0].toFixed(2).replace('.', ',')} €`,
+        zusatz: monatsSpanne(zeilen),
+        betrag: summe,
+      });
+    } else {
+      for (const z of zeilen) {
+        dazu(art, {
+          text: MONATE[z.monat - 1] + ' ' + jahr,
+          zusatz: z.korrigiert ? 'korrigiert' : (z.text || null),
+          betrag: z.betrag,
+        });
+      }
+    }
+  }
+
+  // Frei erfasste Buchungen und Fahrten
+  for (const b of buchungenVon(o.id)) {
+    if (b.kategorie === 'erhaltung') continue;
+    if (Number((b.datum || '').slice(0, 4)) !== jahr) continue;
+    dazu(b.kategorie, {
+      text: b.bezeichnung || artInfo(b.kategorie).text,
+      zusatz: b.datum, betrag: b.betrag || 0, beleg: b.belegNr || null,
+    });
+  }
+  for (const f of fahrtenVon(o.id)) {
+    if (Number((f.datum || '').slice(0, 4)) !== jahr) continue;
+    const e = state.daten.einstellungen;
+    const satz = e.fahrtModus === 'pendler' ? (e.fahrtSatzPendler ?? 0.38) : (e.fahrtSatzReise ?? 0.30);
+    const mal = e.fahrtModus === 'pendler' ? 1 : (f.hinRueck === false ? 1 : 2);
+    dazu('fahrtkosten', {
+      text: f.anlass || 'Fahrt',
+      zusatz: `${f.datum} · ${f.km || 0} km × ${satz.toFixed(2).replace('.', ',')} €`
+        + (mal === 2 ? ' × 2 (hin und zurück)' : ''),
+      betrag: fahrtBetrag(f, e),
+    });
+  }
+
+  for (const [label, posten] of eimer) {
+    raus.push({
+      label, art: 'posten', posten,
+      betrag: -posten.reduce((s, x) => s + x.betrag, 0),
+    });
+  }
+
+  /* Gleiche Anlage-V-Position, mehrere Quellen: Erhaltungsaufwand entsteht
+     aus freien Buchungen *und* aus der monatlichen Instandhaltungsrücklage,
+     beide tragen dasselbe Etikett. Ohne Zusammenfassung stünde die Position
+     zweimal im Anhang – die Summe stimmte, der Ausdruck wäre trotzdem
+     falsch zu lesen. */
+  const zusammen = [];
+  for (const pos of raus) {
+    const da = pos.art === 'hinweis' ? null : zusammen.find((x) => x.label === pos.label && x.art !== 'hinweis');
+    if (!da) { zusammen.push(pos); continue; }
+    da.betrag += pos.betrag;
+    da.posten = [...(da.posten || []), ...(pos.posten || [])];
+    // Die AfA-Rechnung bleibt erhalten, falls sie den Erstplatz hatte.
+    if (pos.rechnung && !da.rechnung) da.rechnung = pos.rechnung;
+  }
+
+  zusammen.sort((x, y) => {
+    // Hinweise ans Ende, sie gehören nicht zur Summe.
+    if ((x.art === 'hinweis') !== (y.art === 'hinweis')) return x.art === 'hinweis' ? 1 : -1;
+    return x.label.localeCompare(y.label);
+  });
+  return zusammen;
+}
+
+const MONATE = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+
+/** „Jan–Dez" bzw. „Okt–Dez" – die Spanne, über die eine Zeile läuft. */
+function monatsSpanne(zeilen) {
+  if (!zeilen.length) return null;
+  const von = Math.min(...zeilen.map((z) => z.monat));
+  const bis = Math.max(...zeilen.map((z) => z.monat));
+  return von === bis ? MONATE[von - 1] : `${MONATE[von - 1]}–${MONATE[bis - 1]}`;
+}
+
 export function anlageVAufstellung(o, jahr) {
   const ist = jahresSummen(o.id, jahr);
   const afaJahr = afaImJahr(o, jahr);
@@ -290,13 +486,20 @@ export function anlageVAufstellung(o, jahr) {
     if (!betrag) continue;
     bucket.set(k.anlageV, (bucket.get(k.anlageV) || 0) + betrag);
   }
-  // Erhaltungsaufwand mit der steuerlichen statt der Cashflow-Verteilung
-  // ersetzen – § 82b EStDV und aktivierte Buchungen wirken hier, nicht in
-  // jahresSummen().
+  /* Erhaltungsaufwand mit der steuerlichen statt der Cashflow-Verteilung
+     **ersetzen** – § 82b EStDV und aktivierte Buchungen wirken hier, nicht
+     in jahresSummen().
+
+     Die Schleife oben hat den Zahlungsbetrag bereits als -erhaltungCash in
+     den Eimer gelegt. Er wird deshalb wieder hinzugerechnet und erst dann
+     durch den steuerlichen Betrag ersetzt. Ihn stattdessen ein zweites Mal
+     abzuziehen verdoppelte jede im laufenden Jahr gebuchte Reparatur. */
   const erhaltungLabel = KATEGORIEN.find((k) => k.key === 'erhaltung').anlageV;
   const erhaltungCash = (ist.erhaltung || 0);
   const erhaltungSteuer = erhaltungSteuerlich(o.id, jahr);
-  bucket.set(erhaltungLabel, (bucket.get(erhaltungLabel) || 0) - erhaltungCash - erhaltungSteuer);
+  const ohneErhaltung = (bucket.get(erhaltungLabel) || 0) + erhaltungCash;
+  if (erhaltungSteuer || ohneErhaltung) bucket.set(erhaltungLabel, ohneErhaltung - erhaltungSteuer);
+  else bucket.delete(erhaltungLabel);
 
   const einnahmen = [];
   const werbungskosten = [{ label: 'Werbungskosten: AfA', betrag: -afaJahr }];

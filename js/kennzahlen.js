@@ -296,7 +296,9 @@ export function objektKennzahlen(o, stichtag = heuteISO()) {
        die Gegenprobe: was noch aussteht und seit wann. */
     mietrueckstand: ist.mietrueckstand || 0, rueckstandSeit: ist.rueckstandSeit || null,
     // Frei erfasste Werbungskosten – je Gruppe und in Summe
-    erhaltung: ist.erhaltung, fahrtkosten: ist.fahrtkosten, sonstigeWk: ist.sonstigeWk,
+    // Die Cashflow-Zeile "Sonstiges" meint die ganze Gruppe, nicht nur
+    // die gleichnamige Einzelkategorie – siehe zahlungen.js.
+    erhaltung: ist.erhaltung, fahrtkosten: ist.fahrtkosten, sonstigeWk: ist.sonstigeWkGesamt,
     werbungskostenFrei: ist.werbungskostenFrei, neutral: ist.neutral,
     // Finanzierung
     darlehenssumme, restschuld, zins, tilgung, sondertilgung, tilgungsersatz,

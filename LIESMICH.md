@@ -236,6 +236,7 @@ werden bewusst nicht verglichen; die laufen auf zwei Geräten ohnehin auseinande
 | 14 | Mieterhöhungsspielraum nach § 558 BGB | fertig |
 | 15 | Staffel- und Indexmiete im Vertrag, mit Erinnerung an den Mieter | fertig |
 | 16 | Druckansicht für Objektblatt, Anlage V und Forecast | fertig |
+| 17 | Anhang zur Anlage V: Herleitung der Werbungskosten | fertig |
 
 ## Aufbau des Codes
 
@@ -490,6 +491,22 @@ kein Ersatz für die formelle, rechtssichere Abrechnung.
 
 **Steuerjahr.** Eigener Menüpunkt mit einer Aufstellung der Einnahmen und Werbungskosten in
 der Gliederung der Anlage V – je Objekt und fürs ganze Portfolio, exportierbar als CSV.
+**Anhang: Herleitung der Werbungskosten.** Je Objekt schließt eine Karte die Aufstellung
+ab, die zeigt, woraus jede Position entstanden ist – und zwar aus denselben Quellen, aus
+denen die Summen gebildet werden. Beide stimmen deshalb auf den Cent überein.
+
+- **AfA** als Rechenweg: Anschaffungskosten, abzüglich Grundstücksanteil, zuzüglich
+  aktivierter Modernisierung, ergibt die Bemessungsgrundlage; davon der AfA-Satz, im
+  Anschaffungsjahr zeitanteilig ab dem Kaufmonat.
+- **Erhaltungsaufwand** je Maßnahme mit Datum und, wo verteilt, dem Jahresanteil samt
+  Hinweis auf § 82b EStDV. Aktivierte Beträge stehen gesondert als Hinweis – sie sind keine
+  Werbungskosten, sondern stecken in der AfA.
+- **Alles Übrige** als die einzelnen Zahlungen. Gleichbleibende Monatsbeträge werden zu einer
+  Zeile zusammengefasst („12 × 155,00 €, Jan–Dez"); sobald ein Monat korrigiert wurde, steht
+  jeder Monat einzeln. **Fahrten** zeigen den Rechenweg: Kilometer × Satz × 2.
+
+Der Anhang beginnt beim Drucken auf einer neuen Seite und lässt sich so getrennt beilegen.
+
 **Zuarbeit fürs Finanzamt oder den Steuerberater, keine Steuerberatung.**
 
 **Grenzen der Buchhaltung**, bewusst gezogen:
