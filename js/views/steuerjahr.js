@@ -4,7 +4,7 @@
    § 82b EStDV bleiben dessen Sache.
 */
 
-import { el, leeren, eur, num, toast, csvZeile, datum } from '../util.js';
+import { el, leeren, eur, num, toast, csvZeile, datum, druckKnopf } from '../util.js';
 import { state } from '../store.js';
 import { anlageVPortfolio, anlageVAufstellung, verteilungenOffen } from '../buchhaltung.js';
 import { hinweis } from '../felder.js';
@@ -39,7 +39,11 @@ export const steuerjahr = {
     ));
     inner.append(aufstellungKarte('Portfolio gesamt', portfolio));
     for (const o of state.daten.objekte) {
-      inner.append(aufstellungKarte(o.bezeichnung || 'Ohne Bezeichnung', anlageVAufstellung(o, jahr)));
+      /* Jedes Objekt beginnt auf einer neuen Seite – beim Finanzamt wird
+         je Objekt eine eigene Anlage V abgegeben. */
+      const karte = aufstellungKarte(o.bezeichnung || 'Ohne Bezeichnung', anlageVAufstellung(o, jahr));
+      karte.classList.add('druck-neue-seite');
+      inner.append(karte);
     }
     const verteilung = verteilungsKarte(jahr);
     if (verteilung) inner.append(verteilung);
@@ -120,6 +124,7 @@ function kopf(neu, portfolio) {
         el('div.faint', { text: 'Einkünfte aus Vermietung (Portfolio)', style: 'font-size:12.5px' }),
         el('div.num' + (portfolio.einkuenfte >= 0 ? '.pos' : '.neg'), { text: eur(portfolio.einkuenfte, 0), style: 'font-weight:600;font-size:18px' }),
       ]),
+      druckKnopf(() => `Anlage V ${jahr}`, () => state.daten.meta.name),
       el('button.btn.btn-sm', { type: 'button', onclick: () => exportieren(portfolio) }, ['CSV']),
     ]),
   ]);

@@ -194,3 +194,40 @@ export function abfragen(titel, beschreibung, { label = 'Name', wert = '', platz
     ],
   }).then((v) => (v === '\0' ? input.value.trim() : null));
 }
+
+
+/* ---------- Drucken ----------
+
+   Gedruckt wird die Ansicht, die ohnehin auf dem Schirm steht – es gibt
+   keine zweite Darstellung, die auseinanderlaufen könnte. Was auf Papier
+   nicht hingehört, blendet css/druck.css aus.
+
+   Hier wird nur der Briefkopf gefüllt: Ohne ihn stünde auf dem Ausdruck
+   nicht, worum es geht und von wann er ist – und genau das braucht man,
+   wenn das Blatt beim Steuerberater oder der Bank landet. */
+
+export function drucken(titel, unterzeile, { quer = false } = {}) {
+  /* Querformat für breite Jahrestabellen – siehe @page quer in druck.css. */
+  document.body.classList.toggle('druck-quer', quer);
+  const t = document.getElementById('druckTitel');
+  const u = document.getElementById('druckUnter');
+  if (t) t.textContent = titel || '';
+  if (u) {
+    const jetzt = new Date();
+    const stand = `Stand ${jetzt.toLocaleDateString('de-DE')}`;
+    u.textContent = unterzeile ? `${unterzeile} · ${stand}` : stand;
+  }
+  /* Der Druckdialog hält den Aufruf an, bis er geschlossen ist – danach
+     bleibt der Kopf stehen, schadet aber nicht: Er ist am Bildschirm
+     unsichtbar und wird beim nächsten Mal überschrieben. */
+  window.print();
+}
+
+/** Knopf „Drucken" im einheitlichen Zuschnitt der Karten-Kopfzeilen. */
+export function druckKnopf(titel, unterzeile, opt = {}) {
+  return el('button.btn.btn-sm', {
+    type: 'button', title: 'Diese Ansicht drucken oder als PDF sichern',
+    onclick: () => drucken(typeof titel === 'function' ? titel() : titel,
+      typeof unterzeile === 'function' ? unterzeile() : unterzeile, opt),
+  }, ['Drucken']);
+}

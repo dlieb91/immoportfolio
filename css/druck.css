@@ -1,0 +1,224 @@
+/* Druckbogen – wird nur beim Drucken geladen (media="print" in index.html).
+
+   Zwei Dinge macht dieses Blatt, und sonst nichts:
+
+   1. **Aus Dunkel wird Hell.** Die App rechnet mit CSS-Variablen; hier
+      werden sie auf Papierwerte gesetzt, statt hundert Regeln zu
+      überschreiben. Dadurch drucken auch Diagramme richtig, die ihre
+      Farben über dieselben Variablen beziehen.
+   2. **Weg mit allem, was keine Information trägt.** Seitenleiste,
+      Kopfzeile, Knöpfe, Filter und Eingabefelder gehören nicht aufs Blatt.
+
+   Was ausdrücklich bleibt: Hinweise und Fußnoten. Gerade die steuerlichen
+   Vorbehalte gehören auf das Papier, das beim Steuerberater landet. */
+
+@page {
+  size: A4;
+  margin: 16mm 14mm 18mm;
+}
+
+/* Breite Jahrestabellen passen im Hochformat nicht auf das Blatt – vierzehn
+   Spalten brauchen die lange Kante. drucken() setzt dafür body.druck-quer. */
+@page quer {
+  size: A4 landscape;
+  margin: 12mm 12mm 14mm;
+}
+body.druck-quer { page: quer; }
+
+/* ---------- Farben: Papier statt Bildschirm ---------- */
+
+/* Dieselben Selektoren wie in app.css, sonst gewinnt die Bildschirmfarbe:
+   `:root[data-theme="dark"]` wiegt schwerer als `html[data-theme="dark"]`,
+   und dann bliebe heller Text auf weißem Papier unsichtbar. */
+:root,
+:root[data-theme="dark"],
+:root[data-theme="light"] {
+  --bg: #fff;
+  --surface: #fff;
+  --surface-2: #f6f6f4;
+  --border: #c8c8c4;
+  --border-strong: #9a9a95;
+  --text: #16181d;
+  --text-dim: #3c4049;
+  --text-faint: #65696f;
+  --accent: #1B2B4A;
+  --accent-soft: #eef1f6;
+  --pos: #1f6b3a;
+  --neg: #a52121;
+  --warn: #8a6100;
+  --shadow: none;
+  /* Diagrammfarben etwas kräftiger – auf Papier wirkt alles blasser. */
+  --serie-ek: #1d4ed8; --serie-fk: #b45309;
+  --serie-pess: #b45309; --serie-basis: #1d4ed8; --serie-opti: #0b7a6d;
+}
+
+html, body {
+  background: #fff;
+  color: #16181d;
+  /* Hintergrundfarben müssen mitgedruckt werden, sonst verschwinden
+     Badges, Kopfzeilen und die Nulllinie der Balken. */
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+body { font-size: 9.5pt; line-height: 1.4; }
+
+/* ---------- Gerüst ---------- */
+
+.sidebar,
+.topbar,
+.nav-schatten,
+#startup,
+#toasts,
+#modalRoot { display: none !important; }
+
+/* Am Bildschirm ist .app ein Vollbild-Flexkasten mit overflow:hidden und
+   .view das einzige scrollende Element. Auf Papier gibt es kein Scrollen –
+   ohne diese Aufhebung druckte nur der sichtbare Ausschnitt. */
+.app {
+  display: block !important;
+  height: auto !important;
+  min-height: 0 !important;
+  overflow: visible !important;
+}
+.main {
+  display: block !important;
+  height: auto !important;
+  overflow: visible !important;
+}
+
+.view {
+  overflow: visible !important;
+  padding: 0 !important;
+  height: auto !important;
+  max-height: none !important;
+}
+.view-inner { max-width: none !important; gap: 10px !important; }
+
+/* ---------- Briefkopf ---------- */
+
+.druckkopf {
+  display: flex !important;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+  padding-bottom: 7px;
+  margin-bottom: 12px;
+  border-bottom: 1.5pt solid var(--accent);
+}
+.druckkopf-marke { display: flex; align-items: center; gap: 8px; }
+.druckkopf-marke strong { display: block; font-size: 11pt; color: var(--accent); letter-spacing: .01em; }
+.druckkopf-marke span { display: block; font-size: 7.5pt; color: var(--text-faint); letter-spacing: .08em; text-transform: uppercase; }
+.druckkopf-text { text-align: right; }
+.druckkopf-text strong { display: block; font-size: 12pt; }
+.druckkopf-text span { display: block; font-size: 8pt; color: var(--text-faint); margin-top: 1px; }
+
+/* ---------- Bedienelemente raus ---------- */
+
+.btn, .icon-btn, .icon-mini, .seg, .save-status, .sync-status,
+.card-head button, .empty, .nav-knopf,
+/* Navigationslinks führen auf Papier nirgendwohin. */
+.zurueck,
+/* Eine leere Ablagefläche für Dateien ist auf dem Ausdruck nur ein Kasten. */
+.dropzone { display: none !important; }
+
+/* Platzhalter sind Eingabehilfen, keine Inhalte – gedruckt sähen sie wie
+   ausgefüllte Werte aus. */
+input::placeholder, textarea::placeholder { color: transparent !important; }
+
+/* Filterkarten tragen nur Bedienelemente – die ganze Karte entfällt.
+   Erkennbar daran, dass sie als einzige die Filterklassen führen. */
+.filterleiste, .filter-karte { display: none !important; }
+
+/* Eingabefelder erscheinen als schlichter Text: Auf Papier zählt der
+   Wert, nicht das Feld, in dem er stand. */
+input, select, textarea {
+  border: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  color: var(--text) !important;
+  font-size: 9.5pt !important;
+  min-height: 0 !important;
+  -webkit-appearance: none;
+  appearance: none;
+}
+input[type="date"]::-webkit-calendar-picker-indicator { display: none; }
+.field label { font-size: 7.5pt; color: var(--text-faint); }
+
+/* ---------- Karten ---------- */
+
+.card {
+  border: .6pt solid var(--border);
+  border-radius: 2pt;
+  box-shadow: none !important;
+  background: #fff;
+  /* Eine Karte soll nicht über den Seitenwechsel zerrissen werden. Kann
+     sie es nicht vermeiden, bricht sie lieber innen als gar nicht. */
+  break-inside: avoid;
+  page-break-inside: avoid;
+  margin-bottom: 8px;
+}
+/* Lange Karten dürfen brechen, sonst bliebe eine halbe Seite leer. */
+.card.lang, .card:has(.plan-scroll) { break-inside: auto; page-break-inside: auto; }
+
+.card-head { padding: 7px 10px 5px; border-bottom: .6pt solid var(--border); }
+.card-head h2 { font-size: 10.5pt; }
+.card-head .sub { font-size: 7.5pt; }
+.card-body { padding: 8px 10px; }
+
+/* ---------- Tabellen ---------- */
+
+/* Ohne das druckt nur der sichtbare Ausschnitt der Jahrestabellen. */
+.plan-scroll {
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+table.data { font-size: 8.5pt; width: 100%; }
+table.data th, table.data td { padding: 2.5pt 4pt; }
+table.data thead th {
+  background: var(--surface-2) !important;
+  border-bottom: .6pt solid var(--border-strong);
+  font-size: 7.5pt;
+}
+/* Mehrseitige Tabellen wiederholen ihren Kopf. */
+table.data thead { display: table-header-group; }
+table.data tfoot { display: table-footer-group; }
+table.data tr { break-inside: avoid; page-break-inside: avoid; }
+.zeile-aktiv { background: var(--accent-soft) !important; }
+
+/* ---------- Kennzahlen und Hinweise ---------- */
+
+.grid-kpi { grid-template-columns: repeat(4, 1fr) !important; gap: 6px !important; }
+.kpi { border: .6pt solid var(--border); padding: 6px 8px; break-inside: avoid; }
+.kpi-label { font-size: 7pt; }
+.kpi-value { font-size: 13pt; }
+.kpi-sub { font-size: 7pt; }
+
+.summen { gap: 6px !important; }
+.summe { border: .6pt solid var(--border); padding: 5px 7px; break-inside: avoid; }
+
+.note, .hint {
+  background: var(--accent-soft) !important;
+  border: .6pt solid var(--border);
+  font-size: 7.5pt;
+  break-inside: avoid;
+}
+.note.note-warn { background: #fdf6e3 !important; border-color: #d9bb6a; }
+.hint { background: transparent !important; border: none; color: var(--text-faint); }
+
+.badge { border: .5pt solid var(--border-strong); background: transparent !important; font-size: 7pt; }
+
+/* ---------- Diagramme ---------- */
+
+.dg-svg { max-width: 100%; height: auto; }
+/* Der Wert-Einblender hängt an der Maus und hat auf Papier nichts verloren. */
+.dg-tip, .dg-kreuz, .dg-marke { display: none !important; }
+
+/* ---------- Seitenumbrüche ---------- */
+
+/* Mit der Klasse lässt sich im Code ein Umbruch erzwingen, etwa vor
+   jedem Objekt der Anlage-V-Aufstellung. */
+.druck-neue-seite { break-before: page; page-break-before: always; }
+.druck-weg { display: none !important; }
+h2, h3 { break-after: avoid; page-break-after: avoid; }

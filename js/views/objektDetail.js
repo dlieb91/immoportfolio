@@ -1,6 +1,6 @@
 /* Objekt-Detailansicht: alle Parameter bearbeiten, Bilder verwalten, löschen. */
 
-import { el, leeren, eur, num, datum, uid, toast, bestaetigen, heuteISO } from '../util.js';
+import { el, leeren, eur, num, datum, uid, toast, bestaetigen, heuteISO, druckKnopf } from '../util.js';
 import {
   state, aendern, objekt as objektMit, nebenkostenBerechnen, nkPosition,
   einheitenVon, mietvertraegeZuObjekt, finanzierungenVon, GRUNDERWERBSTEUER,
@@ -76,12 +76,15 @@ export const objektDetail = {
     inner.append(neuZeichnend((z) => buchungenKarte(o, z, obenNeu)));
     inner.append(nkBox);
     inner.append(neuZeichnend((z) => bilderKarte(o, z)));
-    inner.append(neuZeichnend((z) => dokumenteKarte('objekt', o.id, z)));
+    /* Dateiliste und Änderungsprotokoll bleiben auf dem Bildschirm, nicht
+       auf dem Ausdruck: Auf einem Objektblatt für Bank oder Steuerberater
+       trägt beides nichts bei und kostet nur Seiten. */
+    inner.append(druckAus(neuZeichnend((z) => dokumenteKarte('objekt', o.id, z))));
     inner.append(abschnitt('Notizen', null, textBereich(null, o, 'notizen', {
       zeilen: 5, platzhalter: 'Freitext zum Objekt – Besonderheiten, Ansprechpartner, offene Punkte …',
       protokollLabel: 'Notizen', bezug: o.id,
     })));
-    inner.append(protokollKarte(o.id));
+    inner.append(druckAus(protokollKarte(o.id)));
   },
 };
 
@@ -94,6 +97,12 @@ function neuZeichnend(bauen) {
 }
 
 /* ---------- Kopfbereich ---------- */
+
+/** Hängt die Klasse an, mit der css/druck.css ein Element vom Papier nimmt. */
+function druckAus(knoten) {
+  knoten.classList.add('druck-weg');
+  return knoten;
+}
 
 function kopf(o) {
   const bild = hauptbild(o);
@@ -117,8 +126,10 @@ function kopf(o) {
         el('span.badge.blau', { text: 'Stand ' + datum(heuteISO()) }),
       ]),
     ]),
-    el('div', { style: 'display:flex;gap:8px;align-items:flex-start' }, [
+    el('div', { style: 'display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap' }, [
       el('a.btn.btn-sm', { href: '#/einzelobjekt?id=' + o.id, title: 'Entwicklung dieses Objekts über die Jahre' }, ['Einzelbetrachtung']),
+      druckKnopf(() => o.bezeichnung || 'Objektblatt',
+        () => [o.strasse, [o.plz, o.ort].filter(Boolean).join(' ')].filter(Boolean).join(', ')),
       el('button.btn.btn-danger.btn-sm', { type: 'button', onclick: () => loeschen(o) }, ['Objekt löschen']),
     ]),
   ]);

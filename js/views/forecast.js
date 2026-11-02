@@ -1,6 +1,6 @@
 /* Forecast: Entwicklung des Portfolios über die Jahre, mit Szenarien. */
 
-import { el, leeren, eur, num, toast, csvZeile } from '../util.js';
+import { el, leeren, eur, num, toast, csvZeile, druckKnopf } from '../util.js';
 import { state } from '../store.js';
 import { steuerModus } from '../kennzahlen.js';
 import { prognose, basisParameter, szenarioParameter, SZENARIEN } from '../forecast.js';
@@ -338,7 +338,11 @@ function tabelle(p) {
             + (ersatz ? ' − Tilgungsersatz' : '') + (nach ? ' − Steuer' : ''),
         }),
       ]),
-      el('button.btn.btn-sm', { type: 'button', onclick: () => exportieren(p) }, ['Als CSV exportieren']),
+      el('div', { style: 'display:flex;gap:8px' }, [
+        druckKnopf('Forecast',
+          () => `${state.daten.meta.name} · ${SZENARIEN.find((x) => x.id === szenario)?.name || szenario}` + ` · ${p.jahre[0].jahr}–${p.jahre.at(-1).jahr}`, { quer: true }),
+        el('button.btn.btn-sm', { type: 'button', onclick: () => exportieren(p) }, ['Als CSV exportieren']),
+      ]),
     ]),
     el('div.plan-scroll', {}, [
       el('table.data.kompakt', {}, [

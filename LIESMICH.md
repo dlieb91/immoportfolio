@@ -127,6 +127,31 @@ getippt wird – mit dem Finger gibt es kein Darüberfahren, und beim Abheben
 verschwände der Wert, bevor man ihn gelesen hat. Senkrecht scrollt die Seite
 weiter, waagerechtes Wischen gehört dem Diagramm.
 
+## Drucken
+
+Objektblatt, Anlage-V-Aufstellung und Forecast tragen oben rechts einen Knopf **Drucken**.
+Er öffnet den Druckdialog des Browsers – von dort geht es aufs Papier oder über *Als PDF
+sichern* in eine Datei.
+
+Gedruckt wird **die Ansicht, die ohnehin auf dem Schirm steht**. Es gibt keine zweite
+Darstellung, die irgendwann von der ersten abweichen könnte; `css/druck.css` blendet nur
+aus, was auf Papier nichts beiträgt: Seitenleiste, Kopfzeile, Knöpfe, Filter,
+Navigationslinks, leere Ablageflächen für Dateien und die Platzhalter in Eingabefeldern.
+Beim Objektblatt bleiben zusätzlich Dokumentenliste und Änderungsprotokoll weg – auf einem
+Blatt für Bank oder Steuerberater tragen sie nichts bei und kosten nur Seiten.
+
+**Was bleibt, sind die Hinweise und Fußnoten.** Gerade die steuerlichen Vorbehalte gehören
+auf das Papier, das beim Steuerberater landet.
+
+Jeder Ausdruck trägt oben einen Briefkopf mit Marke, Titel, Portfolioname und Datum. Die
+Anlage-V-Aufstellung beginnt **je Objekt auf einer neuen Seite**, weil beim Finanzamt je
+Objekt eine eigene Anlage V abgegeben wird. Der **Forecast druckt im Querformat** – eine
+Jahrestabelle mit vierzehn Spalten passt im Hochformat nicht auf das Blatt.
+
+Dass die App dunkel dargestellt wird, spielt keine Rolle: Für den Druck werden die
+Farbvariablen auf Papierwerte gesetzt, und Diagramme ziehen automatisch mit, weil sie
+dieselben Variablen benutzen.
+
 ## Abgleich mit Dropbox
 
 ### Einmal einrichten
@@ -210,6 +235,7 @@ werden bewusst nicht verglichen; die laufen auf zwei Geräten ohnehin auseinande
 | 13 | Spekulationsfrist, offene § 82b-Verteilungen, Soll/Ist bei den Mieten | fertig |
 | 14 | Mieterhöhungsspielraum nach § 558 BGB | fertig |
 | 15 | Staffel- und Indexmiete im Vertrag, mit Erinnerung an den Mieter | fertig |
+| 16 | Druckansicht für Objektblatt, Anlage V und Forecast | fertig |
 
 ## Aufbau des Codes
 
@@ -219,6 +245,7 @@ server.js            Mini-Webserver (localhost, optional im Heimnetz)
 index.html           Grundgerüst
 manifest.webmanifest Web-App-Hülle für „Zum Home-Bildschirm"
 css/app.css          Design-System
+css/druck.css        Druckbogen, nur beim Drucken geladen
 js/util.js           Formatierung, DOM-Helfer, Toasts, Dialoge
 js/db.js             IndexedDB: gemerkte Ablage und Gerätespeicher
 sw.js                Service Worker: hält die Programmdateien für offline vor

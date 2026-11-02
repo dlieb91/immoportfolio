@@ -901,3 +901,6 @@ body.touch table.data td select { min-height: 38px; font-size: 16px; }
   border-color: color-mix(in srgb, var(--warn) 40%, transparent);
 }
 .note.note-warn .note-icon { color: var(--warn); }
+
+/* Briefkopf des Ausdrucks – am Bildschirm unsichtbar, siehe css/druck.css. */
+.druckkopf { display: none; }
