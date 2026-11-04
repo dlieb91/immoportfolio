@@ -1,7 +1,8 @@
 /* Steuerjahr: Einnahmen und Werbungskosten in der Gliederung der Anlage V –
    je Objekt und fürs Portfolio, als Zuarbeit fürs Finanzamt oder den
-   Steuerberater. Keine Steuerberatung: Grenzfälle wie die 15-%-Grenze oder
-   § 82b EStDV bleiben dessen Sache.
+   Steuerberater. Keine Steuerberatung: Die 15-%-Grenze anschaffungsnaher
+   Herstellungskosten und die Verteilung nach § 82b EStDV rechnet die App
+   mit, die Beurteilung des Einzelfalls bleibt Sache des Steuerberaters.
 */
 
 import { el, leeren, eur, num, toast, csvZeile, datum, druckKnopf } from '../util.js';
@@ -36,8 +37,11 @@ export const steuerjahr = {
     inner.append(kopf(neu, portfolio));
     inner.append(hinweis(
       'Zuarbeit fürs Finanzamt oder den Steuerberater, <strong>keine Steuerberatung</strong>. '
-      + 'Die Zuordnung zur Anlage V ist vereinfacht; Grenzfälle wie die 15-%-Grenze anschaffungsnaher '
-      + 'Herstellungskosten oder die Verteilung nach § 82b EStDV gehören in fachkundige Hände. '
+      + 'Die Zuordnung zur Anlage V ist vereinfacht. Die <strong>15-%-Grenze</strong> anschaffungsnaher '
+      + 'Herstellungskosten (§ 6 Abs. 1 Nr. 1a EStG) rechnet die App mit: Bleiben die Maßnahmen der ersten '
+      + 'drei Jahre darunter, sind sie hier sofort abgezogen; darüber wandern sie in die AfA. Die App rechnet '
+      + 'dabei mit Bruttobeträgen, das Gesetz mit Nettobeträgen – knapp unter der Grenze lohnt der Blick des '
+      + 'Steuerberaters. '
       + '<strong>Die Erhaltungsrücklage ist nicht enthalten</strong> – Einzahlungen sind erst abziehbar, '
       + 'wenn die Gemeinschaft das Geld verausgabt (BFH IX R 19/24). Erfasse den Betrag dann als '
       + 'Buchung der Kategorie „Erhaltungsaufwand“.'
@@ -203,6 +207,18 @@ function exportieren(portfolio) {
 /* ---------- Anhang: Herleitung der Werbungskosten ---------- */
 
 /**
+ * Der kleine Verweis auf die 15-%-Grenze, der unter jedem Erhaltungsblock
+ * steht – auch wenn die Grenze weit entfernt ist. Wer die Herleitung liest,
+ * soll wissen, dass es sie gibt und wo man gerade steht.
+ */
+function grenzVerweis(g) {
+  const basis = `15-%-Grenze § 6 Abs. 1 Nr. 1a EStG: ${eur(g.betrag, 0)}`;
+  if (!g.aktiv) return `${basis} · Dreijahresfrist seit ${datum(g.bis)} abgelaufen`;
+  return `${basis} · ${eur(g.verbraucht, 0)} verbraucht, noch ${eur(g.offen, 0)} `
+    + `bis zum ${datum(g.bis)} – darüber gelten alle Maßnahmen des Zeitraums als Herstellungskosten`;
+}
+
+/**
  * Zeigt je Position, woraus sie entstanden ist.
  *
  * Die Aufstellung oben nennt nur Summen; wer sie prüfen soll, braucht den
@@ -240,7 +256,11 @@ function herleitungsKarte(o, jahr) {
       }
     } else {
       for (const x of pos.posten) {
-        zeilen.push(zeile(x.text, x.zusatz || x.hinweis || x.datum || null, -(x.betrag || 0)));
+        /* Datum, Verteilung und Herkunft koennen gleichzeitig vorliegen –
+           vorher gewann davon nur die erste Angabe. */
+        const unter = [x.datum ? datum(x.datum) : null, x.hinweis, x.zusatz]
+          .filter(Boolean).join(' · ');
+        zeilen.push(zeile(x.text, unter || null, -(x.betrag || 0)));
       }
     }
 
@@ -256,6 +276,10 @@ function herleitungsKarte(o, jahr) {
       ]),
       pos.text ? el('div.hint', { text: pos.text, style: 'margin:6px 0' }) : null,
       el('table.data.kompakt', {}, [el('tbody', {}, zeilen)]),
+      pos.grenze ? el('div.faint', {
+        style: 'font-size:11.5px;margin-top:4px',
+        text: grenzVerweis(pos.grenze),
+      }) : null,
     ].filter(Boolean));
   };
 

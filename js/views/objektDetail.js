@@ -22,7 +22,7 @@ import {
 import {
   afaWerte, objektKennzahlen, steuerModus, effektiverSteuersatz, kapitalbindung,
 } from '../kennzahlen.js';
-import { KATEGORIEN, nkAbrechnungObjekt, erhaltungsAmpel, fahrtBetrag, spekulationsfrist } from '../buchhaltung.js';
+import { KATEGORIEN, nkAbrechnungObjekt, erhaltungsAmpel, fahrtBetrag, spekulationsfrist, anschaffungsnahePruefung } from '../buchhaltung.js';
 import { dokumenteKarte, protokollKarte, dokumenteEntfernenFuer } from './dokumente.js';
 
 export const objektDetail = {
@@ -941,23 +941,74 @@ function verkehrswertKarte(o, neuZeichnen, obenNeu) {
 
 /* ---------- Modernisierung ---------- */
 
+/**
+ * Wie eine Maßnahme steuerlich behandelt wird.
+ *
+ * Vorgabe ist „automatisch": Binnen drei Jahren nach dem Kauf entscheidet
+ * die 15-%-Grenze des § 6 Abs. 1 Nr. 1a EStG, ob sofort abziehbar oder nur
+ * über die AfA. Die beiden festen Einstellungen gehen vor – für echte
+ * Erweiterungen und für jährlich übliche Erhaltungsarbeiten, die nach
+ * Satz 2 ohnehin aus der Grenze herausfallen.
+ */
+function behandlungWahl(m, nach, stand) {
+  const sel = el('select', {
+    style: 'width:100%',
+    onchange: (e) => {
+      const v = e.target.value;
+      aendern(() => { m.aktiviert = v === 'auto' ? null : v === 'aktiv'; });
+      nach();
+    },
+  }, [
+    el('option', { value: 'auto', selected: m.aktiviert == null }, ['automatisch (15 %)']),
+    el('option', { value: 'sofort', selected: m.aktiviert === false }, ['sofort absetzen']),
+    el('option', { value: 'aktiv', selected: m.aktiviert === true }, ['aktivieren (AfA)']),
+  ]);
+  if (!stand) return sel;
+  return el('div', {}, [
+    sel,
+    el('div.faint', {
+      style: 'font-size:11px;margin-top:2px',
+      text: m.aktiviert != null ? (m.aktiviert ? 'fest: über die AfA' : 'fest: sofort')
+        : stand.aktiviert ? 'Grenze gerissen → AfA'
+        : stand.imFenster ? 'unter der Grenze → sofort'
+        : 'außerhalb der Dreijahresfrist → sofort',
+    }),
+  ]);
+}
+
+/** Ein Satz zur 15-%-Grenze, der immer die aktuelle Lage nennt. */
+function grenzText(p) {
+  if (!p.grenze) return 'die 15-%-Grenze braucht Kaufpreis und Grundstücksanteil';
+  if (!p.aktiv) {
+    return `15-%-Grenze ${eur(p.grenze, 0)} · Dreijahresfrist abgelaufen, Maßnahmen sind `
+      + 'Erhaltungsaufwand oder Herstellungskosten nach ihrer Art';
+  }
+  return `15-%-Grenze ${eur(p.grenze, 0)} · ${eur(p.summe, 0)} verbraucht`
+    + (p.ueberschritten
+      ? ' · überschritten, alle Maßnahmen im Fenster gelten als Herstellungskosten'
+      : ` · noch ${eur(p.offen, 0)} bis zum Kippen in die AfA`)
+    + ` · Frist bis ${datum(p.fensterEnde)}`;
+}
+
 function modernisierungKarte(o, neuZeichnen, obenNeu) {
   const liste = [...(o.modernisierung || [])].sort((a, b) => String(b.datum).localeCompare(String(a.datum)));
   const summeZelle = el('td.num', { style: 'font-weight:600' });
   const summeNeu = () => {
     summeZelle.textContent = eur((o.modernisierung || []).reduce((s, m) => s + (m.betrag || 0), 0));
   };
+  // Auch beim Aufbau, nicht erst nach der ersten Bearbeitung: sonst bleibt
+  // die Summenzeile beim Oeffnen der Karte leer.
+  summeNeu();
   const opt = { nach: () => { summeNeu(); obenNeu(); }, umbauen: neuZeichnen };
+
+  const pruefung = anschaffungsnahePruefung(o);
+  const standVon = (id) => pruefung.massnahmen.find((x) => x.id === id);
 
   const zeilen = liste.map((m) => el('tr', {}, [
     el('td', { style: 'width:150px' }, [tabellenDatum(m, 'datum', opt)]),
     el('td', {}, [tabellenText(m, 'bezeichnung', { platzhalter: 'z. B. Bad saniert, neue Fenster' })]),
     el('td', { style: 'width:140px' }, [tabellenZahl(m, 'betrag', opt)]),
-    el('td', { style: 'width:110px;text-align:center' }, [el('input', {
-      type: 'checkbox', checked: m.aktiviert !== false, style: 'width:auto',
-      title: 'aktivieren (erhöht die AfA-Bemessung) statt sofort als Aufwand',
-      onchange: (e) => { aendern(() => { m.aktiviert = e.target.checked; }); obenNeu(); },
-    })]),
+    el('td', { style: 'width:190px' }, [behandlungWahl(m, obenNeu, standVon(m.id))]),
     el('td', { style: 'width:40px' }, [el('button.icon-mini', {
       type: 'button', title: 'Eintrag entfernen', html: '&times;',
       onclick: () => { aendern(() => { o.modernisierung = o.modernisierung.filter((x) => x !== m); }); neuZeichnen(); },
@@ -969,7 +1020,7 @@ function modernisierungKarte(o, neuZeichnen, obenNeu) {
         el('thead', {}, [el('tr', {}, [
           el('th', { text: 'Datum' }), el('th', { text: 'Maßnahme' }),
           el('th', { style: 'text-align:right', text: 'Betrag (€)' }),
-          el('th', { style: 'text-align:center', text: 'aktiviert' }), el('th', {}),
+          el('th', { text: 'Behandlung' }), el('th', {}),
         ])]),
         el('tbody', {}, zeilen),
         el('tfoot', {}, [el('tr', {}, [
@@ -979,12 +1030,14 @@ function modernisierungKarte(o, neuZeichnen, obenNeu) {
       ])
     : el('div.faint', { text: 'Keine Modernisierungen erfasst.', style: 'font-size:13px' });
 
-  return abschnitt('Modernisierung & Sanierung', 'aktivierte Kosten erhöhen die Abschreibungsgrundlage', [
+  return abschnitt('Modernisierung & Sanierung', grenzText(pruefung), [
     inhalt,
     el('button.btn.btn-sm', {
       type: 'button', style: 'margin-top:12px',
       onclick: () => {
-        aendern(() => { o.modernisierung = [...(o.modernisierung || []), { id: uid('mod'), datum: heuteISO(), bezeichnung: '', betrag: null, aktiviert: true }]; });
+        aendern(() => { o.modernisierung = [...(o.modernisierung || []),
+          // aktiviert: null – die 15-%-Grenze entscheidet, siehe behandlungWahl()
+          { id: uid('mod'), datum: heuteISO(), bezeichnung: '', betrag: null, aktiviert: null }]; });
         neuZeichnen();
       },
     }, ['+ Maßnahme erfassen']),
@@ -1070,6 +1123,10 @@ const MANUELLE_KATEGORIEN = KATEGORIEN.filter((k) => !k.abgeleitet)
   .map((k) => ({ wert: k.key, text: k.text }));
 
 function buchungenKarte(o, neuZeichnen, kennzahlenNeu) {
+  /* Einmal je Aufbau: Welche Massnahmen die 15-%-Grenze aktiviert, haengt
+     an allen zusammen – nicht an der einzelnen Zeile. */
+  const pruefung = anschaffungsnahePruefung(o);
+  const standVon = (id) => pruefung.massnahmen.find((x) => x.id === id);
   const jahr = AKTUELLES_JAHR();
   const buchungen = buchungenVon(o.id).filter((b) => (b.datum || '').startsWith(String(jahr)));
   const fahrten = fahrtenVon(o.id).filter((f) => (f.datum || '').startsWith(String(jahr)));
@@ -1082,29 +1139,22 @@ function buchungenKarte(o, neuZeichnen, kennzahlenNeu) {
       el('td', { style: 'width:190px' }, [tabellenAuswahl(b, 'kategorie', MANUELLE_KATEGORIEN, opt)]),
       el('td', {}, [tabellenText(b, 'bezeichnung', { ...opt, platzhalter: 'Bezeichnung' })]),
       el('td', { style: 'width:120px' }, [tabellenZahl(b, 'betrag', opt)]),
-      el('td', { style: 'width:190px' }, istErhaltung ? [
-        el('label', { style: 'display:flex;align-items:center;gap:5px;font-size:12px;white-space:nowrap' }, [
-          el('input', {
-            type: 'checkbox', checked: !!b.aktiviert, style: 'width:auto',
-            title: 'aktivieren (erhöht die AfA-Bemessung) statt sofort als Aufwand',
-            onchange: (e) => {
-              aendern(() => { b.aktiviert = e.target.checked; if (b.aktiviert) b.verteilenJahre = null; });
-              kennzahlenNeu(); neuZeichnen();
-            },
-          }),
-          'aktivieren',
-          el('select', {
-            style: 'width:auto;font-size:12px', disabled: !!b.aktiviert,
-            title: 'auf mehrere Jahre verteilen, § 82b EStDV',
-            onchange: (e) => {
-              const wert = e.target.value ? Number(e.target.value) : null;
-              aendern(() => { b.verteilenJahre = wert; if (wert) b.aktiviert = false; });
-              kennzahlenNeu(); neuZeichnen();
-            },
-          }, [
-            el('option', { value: '', selected: !b.verteilenJahre }, ['sofort']),
-            ...[2, 3, 4, 5].map((n) => el('option', { value: String(n), selected: b.verteilenJahre === n }, [`${n} Jahre`])),
-          ]),
+      el('td', { style: 'width:210px' }, istErhaltung ? [
+        /* Dieselbe Dreiwegwahl wie in der Modernisierungsliste – es ist
+           steuerlich derselbe Sachverhalt, also auch dieselbe Bedienung. */
+        behandlungWahl(b, () => { kennzahlenNeu(); neuZeichnen(); }, standVon(b.id)),
+        el('select', {
+          style: 'width:100%;font-size:12px;margin-top:4px',
+          disabled: standVon(b.id)?.aktiviert === true,
+          title: 'auf mehrere Jahre verteilen, § 82b EStDV',
+          onchange: (e) => {
+            const wert = e.target.value ? Number(e.target.value) : null;
+            aendern(() => { b.verteilenJahre = wert; if (wert) b.aktiviert = false; });
+            kennzahlenNeu(); neuZeichnen();
+          },
+        }, [
+          el('option', { value: '', selected: !b.verteilenJahre }, ['in einem Jahr']),
+          ...[2, 3, 4, 5].map((n) => el('option', { value: String(n), selected: b.verteilenJahre === n }, [`auf ${n} Jahre (§ 82b)`])),
         ]),
       ] : []),
       el('td', { style: 'width:40px' }, [el('button.icon-mini', {
@@ -1144,14 +1194,21 @@ function buchungenKarte(o, neuZeichnen, kennzahlenNeu) {
     : el('div.faint', { text: `Keine freien Buchungen für ${jahr}.`, style: 'font-size:13px' });
 
   const ampel = erhaltungsAmpel(o);
-  const ampelHinweis = ampel && ampel.stufe !== 'gruen'
+  /* Der Verweis auf die 15-%-Grenze steht immer da, nicht erst wenn es eng
+     wird: Wer eine Rechnung bucht, soll vorher wissen, wie viel Luft bleibt –
+     danach ist die Entscheidung gefallen. */
+  const ampelHinweis = ampel
     ? el('div.hint', {
-        style: `margin-bottom:14px;color:var(--${ampel.stufe === 'rot' ? 'neg' : 'warn'})`,
+        style: 'margin-bottom:14px'
+          + (ampel.stufe === 'gruen' ? '' : `;color:var(--${ampel.stufe === 'rot' ? 'neg' : 'warn'})`),
         text: `Erhaltungsaufwand seit dem Kauf: ${eur(ampel.summe, 0)} von ${eur(ampel.grenze, 0)} `
           + `(15 % der Gebäude-Anschaffungskosten, Frist bis ${datum(ampel.fensterEnde)}). `
           + (ampel.stufe === 'rot'
-            ? 'Über der Grenze – der gesamte Betrag kippt in anschaffungsnahe Herstellungskosten (§ 6 Abs. 1 Nr. 1a EStG) und ist nur noch über die AfA absetzbar.'
-            : 'Nähert sich der Grenze – ein Steuerberater sollte das prüfen, bevor weitere Rechnungen gebucht werden.'),
+            ? 'Über der Grenze – alle Maßnahmen im Fenster kippen in anschaffungsnahe Herstellungskosten (§ 6 Abs. 1 Nr. 1a EStG) und wirken nur noch über die AfA.'
+            : ampel.stufe === 'gelb'
+              ? 'Nähert sich der Grenze – ein Steuerberater sollte das prüfen, bevor weitere Rechnungen gebucht werden.'
+              : `Noch ${eur(ampel.offen, 0)} bis zum Kippen in die AfA (§ 6 Abs. 1 Nr. 1a EStG); `
+                + 'bis dahin sind die Maßnahmen sofort abziehbar.'),
       })
     : null;
 

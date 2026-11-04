@@ -16,8 +16,9 @@
      eine Kaution, die dem Mieter gehört.
 */
 
-import { heuteISO } from './util.js';
+import { heuteISO, datumPlus } from './util.js';
 import {
+  objekt,
   state, einheitenVon, finanzierungenVon, mieteObjekt, mieteEinheit,
   nebenkostenBerechnen, flaecheVon, verkehrswert, besitzMonate, darlehenPlan,
   mieteVereinbartObjekt,
@@ -65,28 +66,144 @@ export function effektiverSteuersatz(o) {
  * gesetzt, ersetzt er die prozentuale Ableitung; auf die Anschaffungskosten
  * gedeckelt, damit das Grundstueck rechnerisch nicht negativ wird.
  */
-export function afaWerte(o) {
-  const nk = nebenkostenBerechnen(o);
-  const anschaffung = nk.gesamt;
+/**
+ * Gebaeude-Anschaffungskosten **ohne jede Modernisierung**.
+ *
+ * Das ist zugleich die Bemessungsgrundlage der 15-%-Grenze des
+ * § 6 Abs. 1 Nr. 1a EStG – und der Grund, warum sie hier eigenstaendig
+ * steht: Wuerde die Pruefung afaWerte() aufrufen, das seinerseits die
+ * Pruefung braucht, drehte sich die Rechnung im Kreis.
+ */
+export function gebaeudeAnschaffung(o) {
+  const anschaffung = nebenkostenBerechnen(o).gesamt;
   const gebaeudeVorgabe = o.gebaeudeanteilManuell != null
     ? Math.min(Math.max(0, o.gebaeudeanteilManuell), anschaffung)
     : null;
   const grundstueck = gebaeudeVorgabe != null
     ? anschaffung - gebaeudeVorgabe
     : anschaffung * ((o.grundstuecksanteil ?? 0) / 100);
-  // Aktivierte Erhaltungsbuchungen zaehlen wie Modernisierungspositionen zur
-  // AfA-Bemessung – ohne zweiten Mechanismus: keine Buchung wird gespiegelt
-  // oder dupliziert, afaWerte() liest lediglich beide Quellen zusammen. Eine
-  // spaeter geaenderte oder geloeschte Buchung wirkt sich damit automatisch aus.
-  const modernisierung = (o.modernisierung || [])
-    .filter((m) => m.aktiviert !== false)
-    .reduce((s, m) => s + (m.betrag || 0), 0)
-    + (state.daten.buchungen || [])
-      .filter((b) => b.objektId === o.id && b.kategorie === 'erhaltung' && b.aktiviert)
-      .reduce((s, b) => s + (b.betrag || 0), 0);
-  const gebaeude = Math.max(0, anschaffung - grundstueck) + modernisierung;
+  return { anschaffung, grundstueck, gebaeude: Math.max(0, anschaffung - grundstueck) };
+}
+
+/** Alle Modernisierungen und Erhaltungsbuchungen eines Objekts, einheitlich. */
+function massnahmenVon(o) {
+  const raus = (o.modernisierung || []).map((m) => ({
+    id: m.id, datum: m.datum, bezeichnung: m.bezeichnung || 'Modernisierung',
+    betrag: m.betrag || 0, aktiviertManuell: m.aktiviert, quelle: 'modernisierung', eintrag: m,
+  }));
+  for (const b of state.daten.buchungen || []) {
+    if (b.objektId !== o.id || b.kategorie !== 'erhaltung') continue;
+    raus.push({
+      id: b.id, datum: b.datum, bezeichnung: b.bezeichnung || 'Erhaltungsaufwand',
+      betrag: b.betrag || 0, aktiviertManuell: b.aktiviert, quelle: 'buchung', eintrag: b,
+    });
+  }
+  return raus.sort((a, b) => String(a.datum).localeCompare(String(b.datum)));
+}
+
+/**
+ * 15-%-Grenze nach § 6 Abs. 1 Nr. 1a EStG.
+ *
+ * Instandsetzungs- und Modernisierungsaufwand binnen **drei Jahren ab
+ * Anschaffung** ist sofort abziehbarer Erhaltungsaufwand, **solange** er
+ * 15 % der Gebaeude-Anschaffungskosten nicht uebersteigt. Wird die Grenze
+ * gerissen, kippen **alle** Massnahmen des Fensters rueckwirkend in
+ * Herstellungskosten und wirken nur noch ueber die AfA – nicht nur der
+ * ueberschiessende Teil.
+ *
+ * Bewusste Vereinfachungen, die der Nutzer kennen muss:
+ * - Das Gesetz rechnet **netto**. Diese App fuehrt durchweg Bruttobetraege;
+ *   bei Rechnungen mit Umsatzsteuer liegt die tatsaechliche Quote also
+ *   niedriger als die hier gezeigte. Die Anzeige sagt das dazu.
+ * - **Jaehrlich ueblicherweise anfallende Erhaltungsarbeiten** und echte
+ *   **Erweiterungen** bleiben nach Satz 2 aussen vor. Welche Massnahme
+ *   darunter faellt, kann die App nicht entscheiden – dafuer gibt es den
+ *   Schalter an der Zeile.
+ */
+export function anschaffungsnahePruefung(o, stichtag = heuteISO()) {
+  const g = gebaeudeAnschaffung(o);
+  const grenze = g.gebaeude * 0.15;
+  const alle = massnahmenVon(o);
+
+  let fensterEnde = null;
+  if (o.kaufdatum) {
+    const [j, m, t] = o.kaufdatum.split('-').map(Number);
+    fensterEnde = datumPlus({ jahre: 3 }, new Date(j, (m || 1) - 1, t || 1));
+  }
+  const imFenster = (d) => !!(fensterEnde && d && d >= o.kaufdatum && d < fensterEnde);
+
+  /* Nur Massnahmen im Fenster zaehlen in die Grenze – und nur solche, die
+     nicht ohnehin von Hand als Herstellungskosten gesetzt sind: Eine echte
+     Erweiterung ist nie Erhaltungsaufwand und faellt nach Satz 2 heraus. */
+  const imFensterListe = alle.filter((x) => imFenster(x.datum) && x.aktiviertManuell !== true);
+  const summe = imFensterListe.reduce((s, x) => s + x.betrag, 0);
+  const ueberschritten = grenze > 0 && summe > grenze;
+  const quote = grenze ? (summe / grenze) * 100 : 0;
+
+  const massnahmen = alle.map((x) => {
+    const drin = imFenster(x.datum);
+    /* true/false sind ausdrueckliche Entscheidungen des Nutzers und gehen
+       vor. Ohne Angabe entscheidet die Grenze: gerissen heisst aktiviert,
+       sonst sofort abziehbar. Ausserhalb des Fensters greift die Regel
+       nicht, dann bleibt es Erhaltungsaufwand. */
+    const aktiviert = x.aktiviertManuell === true ? true
+      : x.aktiviertManuell === false ? false
+      : (drin && ueberschritten);
+    return { ...x, imFenster: drin, aktiviert, automatisch: x.aktiviertManuell == null };
+  });
+
   return {
-    anschaffung, grundstueck, gebaeude, modernisierung,
+    basis: g.gebaeude, grenze, summe, quote, fensterEnde, ueberschritten,
+    offen: Math.max(0, grenze - summe),
+    aktiv: !!fensterEnde && stichtag < fensterEnde && stichtag >= o.kaufdatum,
+    stufe: quote >= 100 ? 'rot' : quote >= 80 ? 'gelb' : 'gruen',
+    massnahmen,
+  };
+}
+
+/** Summe der Massnahmen, die als Herstellungskosten in die AfA gehen. */
+export function aktivierteMassnahmen(o, stichtag = heuteISO()) {
+  return anschaffungsnahePruefung(o, stichtag).massnahmen
+    .filter((x) => x.aktiviert)
+    .reduce((s, x) => s + x.betrag, 0);
+}
+
+/**
+ * Erhaltungsaufwand, wie er steuerlich im Jahr wirkt.
+ *
+ * Quelle sind **beide** Listen: frei erfasste Erhaltungsbuchungen und die
+ * Sanierungen aus der Modernisierungsliste. Welche davon sofort abziehbar
+ * sind, entscheidet die 15-%-Pruefung; aktivierte wirken nur ueber die AfA
+ * und bleiben hier aussen vor.
+ */
+export function erhaltungSteuerlich(objektId, jahr) {
+  const o = objekt(objektId);
+  if (!o) return 0;
+  let summe = 0;
+  for (const x of anschaffungsnahePruefung(o).massnahmen) {
+    if (x.aktiviert) continue;
+    const xJahr = Number((x.datum || '').slice(0, 4));
+    if (!xJahr) continue;
+    /* Verteilung nach § 82b EStDV gibt es nur an freien Buchungen. Nur
+       gesetzte Werte werden auf 2–5 gedeckelt; ohne Verteilung zaehlt der
+       volle Betrag in genau einem Jahr. */
+    const v = x.quelle === 'buchung' ? x.eintrag.verteilenJahre : null;
+    const jahre = v ? Math.min(5, Math.max(2, v)) : 1;
+    if (jahr >= xJahr && jahr < xJahr + jahre) summe += x.betrag / jahre;
+  }
+  return summe;
+}
+
+export function afaWerte(o) {
+  const g = gebaeudeAnschaffung(o);
+  /* Modernisierungen und Erhaltungsbuchungen werden nicht gespiegelt oder
+     dupliziert – afaWerte() liest beide Quellen zusammen, und ob eine
+     Massnahme aktiviert ist, entscheidet die 15-%-Pruefung. Eine spaeter
+     geaenderte oder geloeschte Position wirkt sich damit automatisch aus. */
+  const modernisierung = aktivierteMassnahmen(o);
+  const gebaeude = g.gebaeude + modernisierung;
+  return {
+    anschaffung: g.anschaffung, grundstueck: g.grundstueck, gebaeude, modernisierung,
     afaJahr: gebaeude * ((o.afaSatz ?? 0) / 100),
     afaDauer: o.afaSatz ? 100 / o.afaSatz : 0,
   };
@@ -220,8 +337,15 @@ export function objektKennzahlen(o, stichtag = heuteISO()) {
   const afaJahr = afaImJahr(o, jahr);
   /* Ohne die Erhaltungsrücklage: Ihre Einzahlung ist keine Werbungskosten,
      erst die Verausgabung durch die Gemeinschaft (BFH IX R 19/24). */
+  /* Erhaltungsaufwand zaehlt hier mit seinem **steuerlichen** Betrag, nicht
+     mit dem gezahlten: Die Verteilung nach § 82b EStDV und die 15-%-Grenze
+     wirken auf die Einkuenfte, nicht auf den Cashflow. Frueher stand hier
+     ist.werbungskostenFrei mit dem Zahlungsbetrag – dadurch wichen
+     Kennzahlen und Anlage V voneinander ab. */
+  const erhaltungSteuer = erhaltungSteuerlich(o.id, jahr);
+  const werbungskostenFreiSteuerlich = erhaltungSteuer + ist.fahrtkosten + ist.sonstigeWkGesamt;
   const werbungskosten = ist.bewirtschaftungSteuerlich + ist.betriebskostenUmlagefaehig
-    + zins + afaJahr + ist.werbungskostenFrei;
+    + zins + afaJahr + werbungskostenFreiSteuerlich;
   const einkuenfte = ist.miete + ist.umlagen - werbungskosten;
   const steuersatz = effektiverSteuersatz(o);
   const steuer = einkuenfte * steuersatz / 100;
@@ -412,8 +536,10 @@ export function kapitalbindung(o, stichtag = heuteISO()) {
     // Werbungskosten mindern beides.
     const cfVor = ist.miete - ist.bewirtschaftung - ist.werbungskostenFrei - ist.kapitaldienst;
     const einkuenfte = ist.miete + ist.umlagen - ist.bewirtschaftungSteuerlich
-      - ist.betriebskostenUmlagefaehig
-      - ist.zins - ist.werbungskostenFrei - afaImJahr(o, j, grenze);
+      - ist.betriebskostenUmlagefaehig - ist.zins
+      // wie oben: steuerlicher Erhaltungsaufwand, nicht der gezahlte
+      - (erhaltungSteuerlich(o.id, j) + ist.fahrtkosten + ist.sonstigeWkGesamt)
+      - afaImJahr(o, j, grenze);
     vor += cfVor;
     /* Getrennt gefuehrt, nicht eingerechnet: Eine Erstattung auf Verluste
        dieses Jahres fliesst fruehestens mit der Veranlagung im naechsten.

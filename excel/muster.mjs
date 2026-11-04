@@ -224,6 +224,8 @@ export function fuerApp() {
     gebaeudeanteilManuell: o.gebaeudeanteilManuell ?? null,
     afaSatz: o.afaSatz,
     modernisierung: o.modernisierung
+      // aktiviert: true heisst ausdruecklich „echte Herstellungskosten" und
+      // bleibt deshalb von der 15-%-Pruefung unberuehrt (§ 6 Abs. 1 Nr. 1a S. 2).
       ? [{ id: `mod-${i}`, datum: o.kaufdatum, betrag: o.modernisierung, bezeichnung: 'Sanierung', aktiviert: true }]
       : [],
     werte: o.verkehrswert ? [{ datum: STICHTAG, wert: o.verkehrswert, quelle: 'Muster' }] : [],
@@ -308,7 +310,13 @@ export function fuerApp() {
   });
 
   return {
-    schemaVersion: 8,
+    /* Das Muster gibt sich als aktuell aus und laeuft damit nicht durch die
+       Migrationen. Das ist Absicht: Ein Pruefdatensatz soll beschreiben, was
+       er meint, und sich nicht von spaeteren Umstellungen veraendern lassen.
+       Konkret bliebe sonst die Sanierung unten nicht aktiviert – die Mappe
+       kennt die 15-%-Pruefung nicht und wuerde dann abweichen.
+       Fehlende Felder spaeterer Schemata werden ueberall defensiv gelesen. */
+    schemaVersion: 14,
     meta: {
       name: 'Musterportfolio', erstelltAm: `${STICHTAG}T00:00:00.000Z`,
       geaendertAm: `${STICHTAG}T00:00:00.000Z`, letztesBackup: null,

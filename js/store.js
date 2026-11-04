@@ -9,7 +9,7 @@ import { uid, zeitstempel, heuteISO } from './util.js';
 import { planeSpeichern } from './storage.js';
 import { tilgungsplan } from './finanzmathematik.js';
 
-export const SCHEMA_VERSION = 13;
+export const SCHEMA_VERSION = 14;
 
 export const STANDARD_EINSTELLUNGEN = {
   // Steuern
@@ -302,6 +302,26 @@ export function migrieren(daten) {
     daten.schemaVersion = 13;
   }
 
+  if (v < 14) {
+    /* Die 15-%-Grenze entscheidet jetzt selbst, ob eine Sanierung sofort
+       abziehbar ist oder in die AfA wandert (§ 6 Abs. 1 Nr. 1a EStG).
+
+       Die bisherigen Werte waren Vorgaben, keine Entscheidungen: Neue
+       Modernisierungen kamen mit angehaktem Kaestchen, neue Buchungen ohne.
+       Beide werden deshalb auf „automatisch" gestellt. Wer eine Massnahme
+       ausdruecklich anders behandelt wissen will, setzt das in der Zeile –
+       und dann bleibt es dabei. */
+    for (const o of daten.objekte || []) {
+      for (const m of o.modernisierung || []) {
+        if (m.aktiviert === true) m.aktiviert = null;
+      }
+    }
+    for (const b of daten.buchungen || []) {
+      if (b.kategorie === 'erhaltung' && b.aktiviert === false) b.aktiviert = null;
+    }
+    daten.schemaVersion = 14;
+  }
+
   const basis = neuesPortfolio(daten.meta?.name);
   const zusammen = {
     ...basis,
@@ -401,7 +421,9 @@ export function neuesObjekt(einstellungen = STANDARD_EINSTELLUNGEN) {
     grundstuecksanteil: 20,        // % der Anschaffungskosten, nicht abschreibbar
     gebaeudeanteilManuell: null,   // € · leer = aus grundstuecksanteil abgeleitet
     afaSatz: 2,                    // % p.a.
-    modernisierung: [],            // {id, datum, betrag, bezeichnung, aktiviert}
+    // {id, datum, betrag, bezeichnung, aktiviert} – aktiviert wie bei den
+    // Buchungen: null heisst, die 15-%-Grenze entscheidet.
+    modernisierung: [],
     werte: [],                     // {datum, wert, quelle} – Verkehrswert-Historie
     kosten: {
       hausgeldMonat: null,
@@ -506,9 +528,13 @@ export function neueBuchung(objektId, datum = heuteISO()) {
     belegNr: '',
     notiz: '',
     // Erhaltungsaufwand: entweder auf Jahre verteilen (§ 82b EStDV) oder
-    // aktivieren (dann Spiegelung als Modernisierungsposition) – nie beides.
+    // aktivieren – nie beides.
     verteilenJahre: null,          // 2–5
-    aktiviert: false,
+    /* null = die 15-%-Grenze entscheidet (§ 6 Abs. 1 Nr. 1a EStG).
+       true/false sind ausdrueckliche Entscheidungen und gehen vor:
+       true fuer echte Erweiterungen, false fuer jaehrlich uebliche
+       Erhaltungsarbeiten – beide bleiben nach Satz 2 aussen vor. */
+    aktiviert: null,
   };
 }
 

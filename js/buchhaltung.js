@@ -27,7 +27,13 @@ import {
 import {
   KATEGORIEN, GRUPPEN, artInfo, zahlungsliste, jahresSummen, fahrtBetrag, monatszahlungen,
 } from './zahlungen.js';
-import { afaWerte, afaImJahr } from './kennzahlen.js';
+import {
+  afaWerte, afaImJahr, anschaffungsnahePruefung, gebaeudeAnschaffung, erhaltungSteuerlich,
+} from './kennzahlen.js';
+
+// Die 15-%-Pruefung liegt in kennzahlen.js, weil afaWerte() sie braucht –
+// hier nur weitergereicht, damit die Ansichten einen Ort haben.
+export { anschaffungsnahePruefung, gebaeudeAnschaffung, erhaltungSteuerlich };
 
 export { KATEGORIEN, GRUPPEN, artInfo, fahrtBetrag };
 
@@ -160,24 +166,22 @@ export function nkAbrechnungObjekt(objektId, jahr) {
  * `stufe` ist eine Warnung, keine Buchung – die App reklassifiziert nichts
  * von selbst. Ausserhalb des Dreijahresfensters liefert die Funktion null.
  */
+/**
+ * Ampel zur 15-%-Grenze – nur eine Sicht auf anschaffungsnahePruefung().
+ *
+ * Frueher zaehlte sie ausschliesslich freie Erhaltungsbuchungen. Die
+ * Sanierungen aus der Modernisierungsliste blieben aussen vor, obwohl
+ * § 6 Abs. 1 Nr. 1a EStG sie genauso erfasst – eine Luecke, die genau dann
+ * auffiel, wenn sie teuer wurde.
+ */
 export function erhaltungsAmpel(o, stichtag = heuteISO()) {
   if (!o.kaufdatum) return null;
-  const [j, m, t] = o.kaufdatum.split('-').map(Number);
-  const fensterEnde = datumPlus({ jahre: 3 }, new Date(j, (m || 1) - 1, t || 1));
-  if (stichtag < o.kaufdatum || stichtag >= fensterEnde) return null;
-
-  const summe = buchungenVon(o.id)
-    .filter((b) => b.kategorie === 'erhaltung' && b.datum >= o.kaufdatum && b.datum < fensterEnde)
-    .reduce((s, b) => s + (b.betrag || 0), 0);
-
-  const a = afaWerte(o);
-  const basis = Math.max(0, a.gebaeude - a.modernisierung);
-  const grenze = basis * 0.15;
-  const quote = grenze ? (summe / grenze) * 100 : 0;
-
+  const p = anschaffungsnahePruefung(o, stichtag);
+  if (!p.aktiv) return null;
   return {
-    summe, grenze, basis, quote, fensterEnde,
-    stufe: quote >= 100 ? 'rot' : quote >= 80 ? 'gelb' : 'gruen',
+    summe: p.summe, grenze: p.grenze, basis: p.basis, quote: p.quote,
+    fensterEnde: p.fensterEnde, stufe: p.stufe, offen: p.offen,
+    ueberschritten: p.ueberschritten,
   };
 }
 
@@ -257,27 +261,15 @@ export function verteilungenOffen(objektId, abJahr) {
   return offen.sort((a, b) => (a.datum || '').localeCompare(b.datum || ''));
 }
 
-export function erhaltungSteuerlich(objektId, jahr) {
-  let summe = 0;
-  for (const b of buchungenVon(objektId)) {
-    if (b.kategorie !== 'erhaltung' || b.aktiviert) continue;
-    const bJahr = Number((b.datum || '').slice(0, 4));
-    if (!bJahr) continue;
-    // Nur gesetzte Werte werden auf 2-5 gedeckelt; ohne Verteilung zaehlt
-    // der volle Betrag in genau einem Jahr (jahre = 1, kein Mindestwert 2).
-    const jahre = b.verteilenJahre ? Math.min(5, Math.max(2, b.verteilenJahre)) : 1;
-    if (jahr >= bJahr && jahr < bJahr + jahre) summe += (b.betrag || 0) / jahre;
-  }
-  return summe;
-}
+
 
 /* ---------- Anlage-V-Aufstellung ---------- */
 
 /**
  * Einnahmen und Werbungskosten eines Objekts und Jahres, gruppiert nach der
  * Anlage-V-Zuordnung aus KATEGORIEN. Zuarbeit für die Steuererklärung, keine
- * Steuerberatung – Grenzfälle wie die 15-%-Grenze oder § 82b EStDV bleiben
- * Sache des Steuerberaters.
+ * Steuerberatung: Die 15-%-Grenze und § 82b EStDV sind eingerechnet, die
+ * Beurteilung des Einzelfalls bleibt Sache des Steuerberaters.
  */
 /**
  * Herleitung der Werbungskosten – zeigt, woraus jede Position der Anlage V
@@ -320,33 +312,44 @@ export function werbungskostenHerleitung(o, jahr) {
     });
   }
 
-  /* --- Erhaltungsaufwand, steuerlich (§ 82b EStDV) --- */
+  /* --- Erhaltungsaufwand, steuerlich (§ 82b EStDV und 15-%-Grenze) ---
+     Quelle sind die Maßnahmen aus anschaffungsnahePruefung(): die Buchungen
+     der Kategorie Erhaltung **und** die Modernisierungen. Genau daraus bildet
+     erhaltungSteuerlich() seine Summe. Hier nur die Buchungen zu lesen hatte
+     den Anhang von der Aufstellung abweichen lassen, sobald eine Sanierung
+     als Modernisierung erfasst war. */
+  const pruefung = anschaffungsnahePruefung(o);
   const erhaltungPosten = [];
   const aktiviert = [];
-  for (const b of buchungenVon(o.id)) {
-    if (b.kategorie !== 'erhaltung') continue;
-    const bJahr = Number((b.datum || '').slice(0, 4));
-    if (!bJahr) continue;
-    if (b.aktiviert) {
+  for (const m of pruefung.massnahmen) {
+    const mJahr = Number((m.datum || '').slice(0, 4));
+    if (!mJahr) continue;
+    if (m.aktiviert) {
       /* Aktiviert heisst: nicht sofort abziehbar, sondern über die AfA.
          Das ist keine Werbungskostenposition – aber die Frage „wo sind
          meine 25.000 € geblieben?" beantwortet der Anhang trotzdem, als
          eigener Hinweis ausserhalb der Aufstellung. */
-      if (bJahr === jahr) aktiviert.push({ datum: b.datum, text: b.bezeichnung || 'Erhaltungsaufwand', betrag: b.betrag || 0 });
+      if (mJahr === jahr) {
+        aktiviert.push({
+          datum: m.datum, text: m.bezeichnung, betrag: m.betrag,
+          zusatz: m.automatisch ? '15-%-Grenze überschritten' : 'von Hand aktiviert',
+        });
+      }
       continue;
     }
-    const jahre = b.verteilenJahre ? Math.min(5, Math.max(2, b.verteilenJahre)) : 1;
-    if (jahr < bJahr || jahr >= bJahr + jahre) continue;
+    const verteilen = m.quelle === 'buchung' ? m.eintrag.verteilenJahre : null;
+    const jahre = verteilen ? Math.min(5, Math.max(2, verteilen)) : 1;
+    if (jahr < mJahr || jahr >= mJahr + jahre) continue;
     erhaltungPosten.push({
-      datum: b.datum, text: b.bezeichnung || 'Erhaltungsaufwand',
-      gesamt: b.betrag || 0,
+      datum: m.datum, text: m.bezeichnung,
+      gesamt: m.betrag,
       verteilenJahre: jahre > 1 ? jahre : null,
-      jahrVon: bJahr, jahrBis: bJahr + jahre - 1,
+      jahrVon: mJahr, jahrBis: mJahr + jahre - 1,
       /* `betrag` heisst hier wie ueberall „was in diesem Jahr zaehlt" –
          bei Verteilung also der Jahresanteil, nicht die Rechnungssumme.
          Ein eigener Feldname brach die Darstellung, sobald Posten
          verschiedener Herkunft in derselben Position landeten. */
-      betrag: (b.betrag || 0) / jahre,
+      betrag: m.betrag / jahre,
       hinweis: jahre > 1 ? `auf ${jahre} Jahre verteilt (§ 82b EStDV)` : null,
     });
   }
@@ -355,6 +358,12 @@ export function werbungskostenHerleitung(o, jahr) {
     raus.push({
       label, art: 'erhaltung', posten: erhaltungPosten,
       betrag: -erhaltungPosten.reduce((s, x) => s + x.betrag, 0),
+      /* Der Verweis steht immer dabei, auch wenn die Grenze weit entfernt
+         ist: Wer die Herleitung liest, soll wissen, dass es sie gibt. */
+      grenze: pruefung.grenze ? {
+        betrag: pruefung.grenze, verbraucht: pruefung.summe, offen: pruefung.offen,
+        bis: pruefung.fensterEnde, aktiv: pruefung.aktiv,
+      } : null,
     });
   }
   if (aktiviert.length) {
@@ -419,7 +428,9 @@ export function werbungskostenHerleitung(o, jahr) {
     if (Number((b.datum || '').slice(0, 4)) !== jahr) continue;
     dazu(b.kategorie, {
       text: b.bezeichnung || artInfo(b.kategorie).text,
-      zusatz: b.datum, betrag: b.betrag || 0, beleg: b.belegNr || null,
+      /* Das Datum steht als eigenes Feld, nicht im Zusatztext: Formatieren
+         ist Sache der Ansicht, dieses Modul kennt util.js nicht. */
+      datum: b.datum, betrag: b.betrag || 0, beleg: b.belegNr || null,
     });
   }
   for (const f of fahrtenVon(o.id)) {
@@ -429,7 +440,8 @@ export function werbungskostenHerleitung(o, jahr) {
     const mal = e.fahrtModus === 'pendler' ? 1 : (f.hinRueck === false ? 1 : 2);
     dazu('fahrtkosten', {
       text: f.anlass || 'Fahrt',
-      zusatz: `${f.datum} · ${f.km || 0} km × ${satz.toFixed(2).replace('.', ',')} €`
+      datum: f.datum,
+      zusatz: `${f.km || 0} km × ${satz.toFixed(2).replace('.', ',')} €`
         + (mal === 2 ? ' × 2 (hin und zurück)' : ''),
       betrag: fahrtBetrag(f, e),
     });

@@ -238,6 +238,7 @@ werden bewusst nicht verglichen; die laufen auf zwei Geräten ohnehin auseinande
 | 16 | Druckansicht für Objektblatt, Anlage V und Forecast | fertig |
 | 17 | Anhang zur Anlage V: Herleitung der Werbungskosten | fertig |
 | 18 | Erhaltungsrücklage steuerlich neutral (BFH IX R 19/24) | fertig |
+| 19 | 15-%-Grenze rechnet mit: Sanierung sofort absetzen oder aktivieren | fertig |
 
 ## Aufbau des Codes
 
@@ -467,14 +468,57 @@ fürs laufende Jahr, direkt in der Objektansicht.
 
 - **15-%-Grenze** (§ 6 Abs. 1 Nr. 1a EStG): Erhaltungsaufwand, der binnen drei Jahren ab
   Kauf in Summe 15 % der Gebäude-Anschaffungskosten übersteigt, gilt rückwirkend
-  vollständig als Herstellungskosten – abzuschreiben statt sofort abziehbar. Die
-  Objektansicht führt dazu eine Ampel: gelb ab 80 % der Grenze, rot darüber. Das ist ein
-  **Hinweis, keine Reklassifizierung** – die App bucht nichts von sich aus um.
+  vollständig als Herstellungskosten – abzuschreiben statt sofort abziehbar. Die App
+  **rechnet das mit**, siehe den eigenen Abschnitt weiter unten.
 - **§ 82b EStDV:** Größerer Erhaltungsaufwand lässt sich wahlweise auf 2–5 Jahre verteilen.
   Der Cashflow zeigt den vollen Betrag im Zahlungsjahr, die Steuerwirkung verteilt sich
   gleichmäßig auf die gewählten Jahre.
 - **Aktivieren** statt verteilen erhöht stattdessen direkt die AfA-Bemessungsgrundlage –
   wie eine aktivierte Modernisierung. Verteilen und Aktivieren schließen sich gegenseitig aus.
+
+### Die 15-%-Grenze: sofort absetzen oder abschreiben
+
+Eine Sanierung in den ersten drei Jahren nach dem Kauf ist der teuerste Zweifelsfall der
+Vermietung. Bleibt sie unter der Grenze, mindert sie die Steuer **sofort und in voller
+Höhe**. Reißt sie die Grenze, wird sie zu anschaffungsnahen Herstellungskosten und wirkt
+nur noch über die AfA – bei 2 % also über fünfzig Jahre verteilt.
+
+Die App entscheidet das selbst, statt nur zu warnen:
+
+- **Bemessungsgrundlage** ist der Gebäudeanteil der Anschaffungskosten inklusive
+  Nebenkosten, also ohne Grund und Boden. 15 % davon sind die Grenze.
+- **Das Fenster** sind drei Jahre ab dem Kaufdatum. Maßnahmen davor oder danach zählen
+  nicht mit.
+- **Alles oder nichts:** Wird die Grenze gerissen, kippen **alle** Maßnahmen des Zeitraums
+  in die AfA, nicht nur der übersteigende Teil. Genau auf der Grenze bleibt alles sofort
+  abziehbar – das Gesetz sagt „übersteigen".
+- **Beide Quellen zählen zusammen:** Modernisierungen am Objekt und Buchungen der Kategorie
+  *Erhaltungsaufwand*. Nur eines von beidem zu zählen wäre der häufigste Weg, die Grenze
+  versehentlich zu reißen.
+
+In der Spalte **Behandlung** steht je Maßnahme, was gilt:
+
+| Einstellung | Bedeutung |
+|---|---|
+| automatisch (15 %) | Vorgabe – die Grenze entscheidet, und die Zeile sagt, wie es gerade ausgeht |
+| sofort absetzen | feste Entscheidung, etwa für jährlich übliche Erhaltungsarbeiten |
+| aktivieren (AfA) | feste Entscheidung, etwa für eine echte Erweiterung |
+
+Die beiden festen Einstellungen gehen vor und zählen **nicht** in die Grenze hinein: Nach
+§ 6 Abs. 1 Nr. 1a Satz 2 EStG bleiben jährlich übliche Erhaltungsarbeiten und echte
+Erweiterungen ohnehin außen vor.
+
+Der Verweis auf die Grenze steht überall dort, wo er gebraucht wird: im Untertitel der
+Modernisierungskarte, über den Buchungen und unter dem Erhaltungsaufwand im Anhang der
+Anlage V – jeweils mit dem verbrauchten Betrag, dem noch offenen Rest und dem Fristende.
+
+**Wo die Rechnung an ihre Grenze kommt.** Das Gesetz rechnet mit **Nettobeträgen**, die App
+durchgehend mit Bruttobeträgen (bei Wohnraumvermietung ist die Miete nach § 4 Nr. 12a UStG
+umsatzsteuerfrei, die Vorsteuer also nicht abziehbar – brutto ist dort die richtige Größe,
+hier aber die vorsichtigere). Liegt die Summe knapp unter der Grenze, ist das kein
+Freibrief: dann lohnt der Blick des Steuerberaters. Ob eine Maßnahme überhaupt
+Erhaltungsaufwand ist oder von vornherein Herstellungsaufwand, beurteilt die App nicht –
+das sagst du ihr über die Spalte *Behandlung*.
 
 **Fahrten** (+ Fahrt) werden aus Datum, Kilometern und Anlass erfasst; der Betrag wird
 gerechnet, nicht eingetragen. Zwei Modi unter *Einstellungen*:
@@ -513,7 +557,9 @@ denen die Summen gebildet werden. Beide stimmen deshalb auf den Cent überein.
   aktivierter Modernisierung, ergibt die Bemessungsgrundlage; davon der AfA-Satz, im
   Anschaffungsjahr zeitanteilig ab dem Kaufmonat.
 - **Erhaltungsaufwand** je Maßnahme mit Datum und, wo verteilt, dem Jahresanteil samt
-  Hinweis auf § 82b EStDV. Aktivierte Beträge stehen gesondert als Hinweis – sie sind keine
+  Hinweis auf § 82b EStDV – aus beiden Quellen, Buchungen wie Modernisierungen. Darunter
+  steht immer der Stand der 15-%-Grenze. Aktivierte Beträge stehen gesondert als Hinweis,
+  mit dem Grund (Grenze überschritten oder von Hand gesetzt) – sie sind keine
   Werbungskosten, sondern stecken in der AfA.
 - **Alles Übrige** als die einzelnen Zahlungen. Gleichbleibende Monatsbeträge werden zu einer
   Zeile zusammengefasst („12 × 155,00 €, Jan–Dez"); sobald ein Monat korrigiert wurde, steht
