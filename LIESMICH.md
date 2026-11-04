@@ -86,6 +86,14 @@ Auf dem iPad diese Adresse in Safari öffnen und über *Teilen → Zum
 Home-Bildschirm* ablegen. Erst damit ist der Speicher dauerhaft (siehe oben) und
 die App startet im Vollbild.
 
+Im Vollbild reicht die App bis unter die **Statusleiste** des iPads (Uhrzeit, WLAN,
+Akku). Kopfzeile, Seitenleiste und die Brief-Seite halten diesen Streifen deshalb
+frei und legen einen dunklen Hintergrund darunter – iOS zeichnet die Symbole weiß,
+auf der hellen Kopfzeile des hellen Themas wären sie sonst kaum zu sehen. Am
+Rechner und im normalen Browserfenster ist der Streifen null hoch, dort ändert sich
+nichts. Die Höhe der App folgt der sichtbaren Fläche (`100dvh`), damit Safaris
+Symbolleiste im Browser den unteren Rand nicht verdeckt.
+
 ### Eine neue Fassung veröffentlichen
 
 ```
@@ -257,6 +265,7 @@ werden bewusst nicht verglichen; die laufen auf zwei Geräten ohnehin auseinande
 | 21 | Anschlussfinanzierung: Varianten und Forward-Schwelle nach Ablauf der Zinsbindung | fertig |
 | 22 | Liquiditätsvorschau über zwölf Monate | fertig |
 | 23 | Schreiben an den Mieter: Verlangen (§ 558), Indexerklärung (§ 557b), Ankündigung der Staffel | fertig |
+| 24 | iPad im Vollbild: Kopfzeile nicht mehr unter der Statusleiste | fertig |
 
 ## Aufbau des Codes
 
