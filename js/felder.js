@@ -8,11 +8,26 @@
 import { el, num } from './util.js';
 import { aendern, protokollieren } from './store.js';
 
+/**
+ * Liest eine Zahl aus einer Eingabe – deutsch geschrieben, aber nachsichtig.
+ *
+ * Der Punkt ist zweideutig: „1.000" meint tausend, „1.5" meint eineinhalb.
+ * Entschieden wird nach der Schreibweise, nicht nach Vermutung:
+ *   - Steht ein Komma da, ist es das Dezimalzeichen und jeder Punkt trennt
+ *     Tausender („1.234,50").
+ *   - Sonst sind Punkte nur dann Tausendertrenner, wenn sie es formal auch
+ *     sind: auf jeden folgen genau drei Ziffern („1.000", „1.234.567").
+ *   - Alles andere gilt als Dezimalpunkt („1.5", „0.75") – so tippt, wer
+ *     eine englische Tastatur gewohnt ist.
+ */
 export function parseZahl(text) {
   if (text == null) return null;
   const s = String(text).trim().replace(/\s|€|%|m²/g, '');
   if (!s) return null;
-  const normalisiert = s.includes(',') ? s.replace(/\./g, '').replace(',', '.') : s;
+  let normalisiert;
+  if (s.includes(',')) normalisiert = s.replace(/\./g, '').replace(',', '.');
+  else if (/^[+-]?\d{1,3}(\.\d{3})+$/.test(s)) normalisiert = s.replace(/\./g, '');
+  else normalisiert = s;
   const v = Number(normalisiert);
   return Number.isFinite(v) ? v : null;
 }
@@ -71,13 +86,16 @@ export function textFeld(label, obj, key, opts = {}) {
  */
 export function zahlEingabe(obj, key, opts = {}) {
   const nk = opts.nachkomma ?? 2;
+  /* Eine Jahreszahl ist keine Menge: „1.945" liest sich als Betrag und nicht
+     als Baujahr. Mit opts.jahr bleibt die Gruppierung weg. */
+  const zeigen = (v) => (opts.jahr ? String(Math.round(v)) : num(v, nk));
   return el('input', {
     type: 'text', inputmode: 'decimal', placeholder: opts.platzhalter || '',
-    value: obj[key] == null ? '' : num(obj[key], nk),
+    value: obj[key] == null ? '' : zeigen(obj[key]),
     onchange: (e) => {
       const v = parseZahl(e.target.value);
       setzen(opts, obj, key, opts.label, v);
-      e.target.value = v == null ? '' : num(v, nk);
+      e.target.value = v == null ? '' : zeigen(v);
     },
   });
 }
