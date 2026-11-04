@@ -24,6 +24,41 @@ function abschnitt(titel, sub, felder, hinweisHtml) {
   ]);
 }
 
+/**
+ * Holt die Programmdateien neu – nicht die Daten.
+ *
+ * Browser halten geladene Module zaeh fest, und auf dem iPad kommt der
+ * Service Worker dazu. Eine veroeffentlichte Korrektur kann deshalb
+ * unsichtbar bleiben, obwohl der Server sie laengst ausliefert. Dieser Knopf
+ * raeumt beides weg und laedt neu. Das Portfolio liegt in der Datei
+ * beziehungsweise in IndexedDB und bleibt unberuehrt.
+ */
+async function programmErneuern() {
+  const ja = await bestaetigen(
+    'Programm erneuern?',
+    'Die Programmdateien werden frisch vom Server geholt und die Seite lädt neu. '
+    + 'Deine Daten bleiben unverändert.',
+    { okText: 'Erneuern' }
+  );
+  if (!ja) return;
+  await sofortSpeichern();
+  try {
+    if ('caches' in window) {
+      const namen = await caches.keys();
+      await Promise.all(namen.map((n) => caches.delete(n)));
+    }
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map((r) => r.unregister()));
+    }
+  } catch (e) {
+    console.warn('Zwischenspeicher liess sich nicht raeumen:', e.message);
+  }
+  /* Der Parameter zwingt auch den haertesten Zwischenspeicher zu einer
+     frischen Startseite; von dort laedt alles Weitere neu. */
+  location.replace(location.pathname + '?neu=' + Date.now() + location.hash);
+}
+
 /* ---------- Ansicht ---------- */
 
 export const einstellungen = {
@@ -100,6 +135,7 @@ export const einstellungen = {
           backupBox,
         ]),
         el('div', { style: 'display:flex;gap:9px;flex-wrap:wrap;margin-top:20px;padding-top:18px;border-top:1px solid var(--border)' }, [
+          el('button.btn', { type: 'button', onclick: programmErneuern }, ['Programm erneuern']),
           el('button.btn', { type: 'button', onclick: exportieren }, ['Als Datei exportieren']),
           el('button.btn', { type: 'button', onclick: () => importieren(container) }, ['Aus Datei importieren']),
           el('button.btn.btn-danger', { type: 'button', onclick: schliessen }, ['Portfolio schließen']),

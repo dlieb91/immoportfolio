@@ -11,7 +11,7 @@
    durchgereicht, damit ein fehlgeschlagener Abgleich als Fehler ankommt
    und nicht als veraltete Antwort aus dem Zwischenspeicher. */
 
-const CACHE = 'immo-huelle-v1';
+const CACHE = 'immo-huelle-v2';
 
 const HUELLE = [
   './',
@@ -48,8 +48,13 @@ self.addEventListener('fetch', (e) => {
   if (url.origin !== location.origin) return;
   if (e.request.method !== 'GET') return;
 
+  /* `cache: 'no-store'` ist der Kern: Ohne das darf der Browser die Anfrage
+     aus seinem **eigenen** Zwischenspeicher bedienen, und dann hilft es
+     nichts, dass hier das Netz zuerst gefragt wird – die Antwort ist trotzdem
+     alt. Genau so blieb eine veroeffentlichte Korrektur auf dem iPad
+     unsichtbar. Die Huelle unten faengt den Offline-Fall weiterhin ab. */
   e.respondWith(
-    fetch(e.request)
+    fetch(e.request, { cache: 'no-store' })
       .then((antwort) => {
         if (antwort.ok) {
           const kopie = antwort.clone();

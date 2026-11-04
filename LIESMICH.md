@@ -152,6 +152,20 @@ Dass die App dunkel dargestellt wird, spielt keine Rolle: Für den Druck werden 
 Farbvariablen auf Papierwerte gesetzt, und Diagramme ziehen automatisch mit, weil sie
 dieselben Variablen benutzen.
 
+## Wenn eine Neuerung nicht ankommt
+
+Die App hält ihre Programmdateien für den Offline-Betrieb vor. Browser – auf dem
+iPad besonders hartnäckig – können deshalb eine alte Fassung weiterbenutzen, obwohl
+der Server längst die neue ausliefert. Daran erkennt man es: Die Korrektur ist
+veröffentlicht, aber auf dem Gerät ändert sich nichts.
+
+Der Regelfall ist, dass sich das von selbst erledigt: Die App fragt für jede
+Programmdatei ausdrücklich am Netz nach und lädt einmal neu, sobald ein neuer
+Stand übernommen wurde. Bleibt doch etwas hängen, hilft **Einstellungen →
+Programm erneuern**: Das räumt den Zwischenspeicher, meldet den Service Worker ab
+und lädt die Seite frisch. **Deine Daten bleiben unberührt** – sie liegen in der
+Datei beziehungsweise im Gerätespeicher, nicht im Zwischenspeicher der App.
+
 ## Abgleich mit Dropbox
 
 ### Einmal einrichten
@@ -239,6 +253,7 @@ werden bewusst nicht verglichen; die laufen auf zwei Geräten ohnehin auseinande
 | 17 | Anhang zur Anlage V: Herleitung der Werbungskosten | fertig |
 | 18 | Erhaltungsrücklage steuerlich neutral (BFH IX R 19/24) | fertig |
 | 19 | 15-%-Grenze rechnet mit: Sanierung sofort absetzen oder aktivieren | fertig |
+| 20 | Programmdateien erneuern sich zuverlässig (Zwischenspeicher) | fertig |
 
 ## Aufbau des Codes
 

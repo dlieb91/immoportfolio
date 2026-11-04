@@ -167,9 +167,20 @@ function startFehler(titel, html) {
  */
 function offlineVorbereiten() {
   if (!('serviceWorker' in navigator) || !window.isSecureContext) return;
-  navigator.serviceWorker.register('sw.js').catch((e) => {
-    console.warn('Offline-Betrieb nicht verfügbar:', e.message);
+  /* Uebernimmt ein neuer Service Worker, laufen die bereits geladenen Module
+     noch aus der alten Fassung – einmal neu laden holt sie. Das Merkmal
+     verhindert die Schleife, falls der Wechsel noch einmal auftritt. */
+  let neugeladen = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (neugeladen) return;
+    neugeladen = true;
+    location.reload();
   });
+  navigator.serviceWorker.register('sw.js')
+    .then((reg) => reg.update())
+    .catch((e) => {
+      console.warn('Offline-Betrieb nicht verfügbar:', e.message);
+    });
 }
 
 async function starten() {
