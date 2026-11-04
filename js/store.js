@@ -26,6 +26,8 @@ export const STANDARD_EINSTELLUNGEN = {
   kappungsgrenzeProzent: 20,
   inflation: 2.0,
   anschlusszins: 4.5,         // % nach Ablauf der Zinsbindung
+  // Forward-Darlehen: Zinsaufschlag in Prozentpunkten je Monat Vorlauf, ab dem 13. Monat
+  forwardAufschlagMonat: 0.02,
   verkaufNachJahren: null,    // Verkaufsszenario im Forecast, leer = kein Verkauf
   verkaufskosten: 3.0,        // % vom Verkaufserlös
   // Nur Vorbelegung beim Anlegen eines Objekts – erfasst wird je Objekt.

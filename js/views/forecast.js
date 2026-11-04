@@ -4,6 +4,8 @@ import { el, leeren, eur, num, toast, csvZeile, druckKnopf } from '../util.js';
 import { state } from '../store.js';
 import { steuerModus } from '../kennzahlen.js';
 import { prognose, basisParameter, szenarioParameter, SZENARIEN } from '../forecast.js';
+import { liquiditaetsvorschau } from '../liquiditaet.js';
+import { laufenderMonat } from '../zahlungen.js';
 import { flaechenDiagramm, linienDiagramm, balkenDiagramm, farbe } from '../diagramm.js';
 import { hinweis } from '../felder.js';
 import { annahmenKarte } from './annahmen.js';
@@ -55,6 +57,7 @@ export const forecast = {
       ));
     }
     inner.append(kennzahlen(p));
+    inner.append(liquiditaetKarte());
     inner.append(vermoegenKarte(p));
     inner.append(cashflowKarte(p));
     if (vergleich) inner.append(vergleichKarte(alle));
@@ -116,6 +119,90 @@ function kennzahlen(p) {
       letzt[kumFeld] >= 0 ? 'pos' : 'neg'),
     kachel('Getilgt', eur(erst.restschuld - letzt.restschuld, 0),
       erst.restschuld ? `${num((erst.restschuld - letzt.restschuld) / erst.restschuld * 100, 0)} % der heutigen Restschuld` : 'unfinanziert'),
+  ]);
+}
+
+/* ---------- Liquiditätsvorschau ---------- */
+
+const MONAT_KURZ = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+const MONAT_LANG = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+// Im Fließtext ausgeschrieben („im März 2027"), nur die Spaltenköpfe sind kurz.
+const monatLang = (periode) => `${MONAT_LANG[Number(periode.slice(5, 7)) - 1]} ${periode.slice(0, 4)}`;
+
+/**
+ * Die nächsten zwölf Monate, Monat für Monat – im Gegensatz zum Rest der
+ * Ansicht keine Prognose mit Annahmen, sondern die erfassten Verträge, Raten
+ * und Buchungen nach vorn geschrieben. Der Forecast zeigt, wohin das
+ * Portfolio in Jahren läuft; diese Karte, ob es nächsten Februar reicht.
+ */
+function liquiditaetKarte() {
+  const v = liquiditaetsvorschau(laufenderMonat(), 12);
+  const zeigeNeutral = v.monate.some((m) => m.neutral);
+
+  const zahl = (wert, opt = {}) => el('td.num' + (opt.farbe ? (wert >= 0 ? '.pos' : '.neg') : ''), {
+    text: wert ? eur(wert, 0) : '–',
+    style: (opt.fett ? 'font-weight:600;' : '')
+      + (opt.tief ? 'background:var(--accent-soft);' : ''),
+  });
+
+  /* Erste Spalte bleibt beim Wischen stehen – ohne sie wüsste man auf dem
+     iPad nach zwei Monaten nicht mehr, welche Zeile welche ist. */
+  const fest = 'position:sticky;left:0;background:var(--surface);z-index:1;white-space:nowrap;';
+  const zeile = (label, feld, opt = {}) => el('tr', {}, [
+    el('td', { text: label, style: fest + (opt.fett ? 'font-weight:600;' : '') }),
+    ...v.monate.map((m) => zahl(m[feld], { ...opt, tief: m.periode === v.tiefpunkt?.periode && v.bedarf > 0 })),
+  ]);
+
+  // Der Monat mit dem schwächsten Ergebnis, erklärt durch seine größten Ausgaben
+  const schwach = v.monate.reduce((a, m) => (m.saldo < a.saldo ? m : a), v.monate[0]);
+  const ausgaben = schwach.posten.filter((x) => x.betrag < 0).slice(0, 3);
+
+  return el('div.card', {}, [
+    el('div.card-head', {}, [
+      el('div', {}, [
+        el('h2', { text: 'Liquidität – die nächsten zwölf Monate' }),
+        el('div.sub', {
+          text: `${monatLang(v.monate[0].periode)} bis ${monatLang(v.monate.at(-1).periode)} · vor Steuern`
+            + ` · Summe ${v.summe.saldo >= 0 ? '+' : ''}${eur(v.summe.saldo, 0)}`,
+        }),
+      ]),
+      druckKnopf('Liquiditätsvorschau',
+        () => `${state.daten.meta.name} · ${monatLang(v.monate[0].periode)} bis ${monatLang(v.monate.at(-1).periode)}`,
+        { quer: true }),
+    ]),
+    el('div.plan-scroll', {}, [
+      el('table.data.kompakt', {}, [
+        el('thead', {}, [el('tr', {}, [
+          // Höher als die übrigen Kopfzellen (z-index 1): Die später im Dokument
+          // liegenden überdeckten sonst die feste Ecke beim Wischen.
+          el('th', { text: '', style: fest + 'z-index:3;' }),
+          ...v.monate.map((m) => el('th', { style: 'text-align:right', text: `${MONAT_KURZ[m.monat - 1]} ${String(m.jahr).slice(2)}` })),
+        ])]),
+        el('tbody', {}, [
+          zeile('Einnahmen', 'einnahmen'),
+          zeile('Laufende Kosten', 'kosten'),
+          zeile('Kapitaldienst', 'kapitaldienst'),
+          zeigeNeutral ? zeile('Kaution & Privat', 'neutral') : null,
+          zeile('Saldo', 'saldo', { fett: true, farbe: true }),
+          zeile('kumuliert', 'kumuliert', { farbe: true }),
+        ].filter(Boolean)),
+      ]),
+    ]),
+    el('div', { style: 'padding:12px 18px;border-top:1px solid var(--border);display:grid;gap:8px' }, [
+      v.bedarf > 0
+        ? hinweis(`<strong>Tiefster Stand im ${monatLang(v.tiefpunkt.periode)}:</strong> ${eur(-v.bedarf, 0)} gegenüber heute. `
+          + 'So viel Reserve braucht es, um die zwölf Monate ohne Zuschuss von außen zu überstehen.')
+        : hinweis('<strong>Kein Zuschuss nötig:</strong> Die Summe der Monate fällt zu keinem Zeitpunkt unter den heutigen Stand.'),
+      schwach.saldo < 0 && ausgaben.length
+        ? hinweis(`<strong>Schwächster Monat ist der ${monatLang(schwach.periode)}</strong> (${eur(schwach.saldo, 0)}). `
+          + 'Größte Ausgaben: ' + ausgaben.map((x) => `${x.text} ${eur(x.betrag, 0)}`).join(', ') + '.')
+        : null,
+      el('div.hint', { html:
+        '<strong>Grenzen:</strong> Gerechnet wird vor Steuern; eine Erstattung oder Nachzahlung ist nicht vorhergesagt. '
+        + 'Kosten, die als Jahresbetrag oder als Erhaltungsrücklage erfasst sind, erscheinen als Zwölftel – '
+        + 'wer etwa die Grundsteuer im Februar sehen will, erfasst sie als <em>Buchung</em> mit Datum im Februar. '
+        + 'Eine erhaltene Kaution steht unter „Kaution &amp; Privat“, denn das Geld gehört dem Mieter.' }),
+    ].filter(Boolean)),
   ]);
 }
 

@@ -254,6 +254,8 @@ werden bewusst nicht verglichen; die laufen auf zwei Geräten ohnehin auseinande
 | 18 | Erhaltungsrücklage steuerlich neutral (BFH IX R 19/24) | fertig |
 | 19 | 15-%-Grenze rechnet mit: Sanierung sofort absetzen oder aktivieren | fertig |
 | 20 | Programmdateien erneuern sich zuverlässig (Zwischenspeicher) | fertig |
+| 21 | Anschlussfinanzierung: Varianten und Forward-Schwelle nach Ablauf der Zinsbindung | fertig |
+| 22 | Liquiditätsvorschau über zwölf Monate | fertig |
 
 ## Aufbau des Codes
 
@@ -277,6 +279,7 @@ js/abgleich.js       wann abgeglichen wird, Konfliktdialog, Statusanzeige
 js/mieterhoehung.js  Spielraum nach § 558 BGB (rein, ohne Oberfläche)
 js/store.js          Datenmodell, Zustand, Berechnungen
 js/finanzmathematik.js  Tilgungsrechnung (rein, ohne Oberfläche)
+js/liquiditaet.js    Liquiditätsvorschau über zwölf Monate (rein, ohne Oberfläche)
 js/kennzahlen.js     Cashflow, Renditen, Steuern (rein, ohne Oberfläche)
 js/zahlungen.js      Zahlungsebene: abgeleitete Zeilen + freie Buchungen/Fahrten (rein)
 js/buchhaltung.js    Hauptbuch, Nebenkostenabrechnung, Erhaltungs-Ampel, Anlage V (rein)
@@ -334,6 +337,32 @@ der Tilgungsanteil verändert sich entsprechend. Nur wenn die Rate die Zinsen ni
 unter **1 % der Restschuld**, wird die Rate auf Zins + 1 % Tilgung angehoben. Ohne diese
 Mindesttilgung käme die Rückführung bei einem kräftigen Zinssprung fast zum Erliegen –
 eine Bank würde das nicht mittragen.
+
+**Anschlussfinanzierung.** Solange die Zinsbindung noch läuft, rechnet die Darlehensansicht
+darunter durch, was danach käme. Grundlage ist die **Restschuld zum Bindungsende**; jede
+Variante ist eine neue Finanzierung über genau diesen Betrag und läuft durch denselben
+Tilgungsplan wie alles andere – es gibt keine zweite Tilgungsformel. Je angenommenem Zins
+(die Mitte plus und minus ein Prozentpunkt) stehen drei Gestalten nebeneinander:
+
+| Variante | festgehalten | zeigt |
+|---|---|---|
+| Heutige Rate bleibt | die Monatsrate | wie sich die Laufzeit verlängert oder verkürzt |
+| Tilgung bleibt | der anfängliche Tilgungssatz | wie sich die Rate ändert |
+| Volltilgung in *n* Jahren | das Zieljahr | welche Rate dafür nötig ist |
+
+Der **Forward-Vergleich** ist ehrlich gebaut: Wer sich den Zins heute für später sichert, zahlt
+einen Aufschlag je Monat Vorlauf, meist ab dem 13. Monat (Vorgabe 0,02 Prozentpunkte, unter
+*Einstellungen* änderbar – der Wert deines Angebots gilt, nicht meine Vorgabe). Die App
+**empfiehlt nichts**, denn welches Zinsniveau in acht Jahren herrscht, weiß sie so wenig wie
+sonst jemand. Sie nennt die Schwelle: Liegt der Marktzins bei Bindungsende über dem
+Forward-Zins, hat sich das Forward gelohnt.
+
+Die Annahmen der Karte (Zins, Zieljahre, Marktzins heute) sind Was-wäre-wenn-Werte und werden
+**nicht gespeichert**. Nicht enthalten sind Bearbeitungsgebühr, Vorfälligkeitsentschädigung und
+Sondertilgungen; der Zins bleibt je Variante bis zur Volltilgung gleich. Bei einem Darlehen
+ohne Tilgung (endfällig, Tilgungsersatz) steht die Restschuld bis zum Bindungsende still, und das
+Ansparguthaben ist nicht gegengerechnet. Läuft die Bindung binnen zwei Jahren aus, führt der
+Hinweis im Dashboard bei genau einem Darlehen direkt zu dieser Karte.
 
 **Tilgungsersatz.** Jedes Darlehen hat unter den Konditionen den Schalter
 *„Tilgungsersatz statt Tilgung"*. Ist er gesetzt, wird das Darlehen nicht getilgt – die
@@ -430,6 +459,26 @@ vor, das den Gebäudewert als festen Betrag statt als Prozentsatz ausweist, trä
 stattdessen unter „Gebäudeanteil, manuell" ein – er ersetzt dann den Grundstücksanteil.
 Im Anschaffungsjahr wird die AfA ab dem Kaufmonat zeitanteilig angesetzt. Der AfA-Satz ist
 frei eingebbar – für ein Restnutzungsdauer-Gutachten trägst du z. B. 3,226 % ein (31 Jahre).
+
+**Liquidität.** Die erste Karte im Forecast zeigt die **nächsten zwölf Monate**, Monat für
+Monat: Einnahmen, laufende Kosten, Kapitaldienst und der Saldo, dazu der kumulierte Stand.
+Der Forecast darunter rechnet in Jahresschritten, aber die Klemme entsteht in einem Monat –
+wenn die Grundsteuer im Februar fällig ist und erst die Miete im März alles ausgleicht, nützt
+ein gutes Jahresergebnis nichts.
+
+Gerechnet wird aus den **erfassten** Mietverträgen, Raten und Buchungen, ohne Annahmen: Das ist
+keine Prognose, sondern die vorhandenen Daten nach vorn geschrieben. Weil die App den
+Kontostand nicht kennt, beginnt der kumulierte Stand bei null; aussagekräftig ist der
+**Tiefpunkt** – so viel Reserve braucht es, um die zwölf Monate ohne Zuschuss von außen zu
+überstehen. Der schwächste Monat wird mit seinen größten Ausgaben erklärt, das Dashboard nennt
+den Bedarf in einer Zeile.
+
+Zwei Grenzen, die man kennen muss. **Vor Steuern:** Eine Erstattung oder Nachzahlung ist nicht
+vorhergesagt. **Zwölftel bleiben Zwölftel:** Was als Jahresbetrag oder als Erhaltungsrücklage
+erfasst ist, erscheint gleichmäßig verteilt, nicht im Fälligkeitsmonat. Wer die Grundsteuer im
+Februar sehen will, erfasst sie als **Buchung** mit Datum im Februar – dieselbe Logik, nach der
+die App das Zuflussprinzip führt. Eine erhaltene Kaution steht in einer eigenen Zeile *Kaution &
+Privat*, denn das Geld gehört dem Mieter.
 
 **Forecast.** Die Annahmen stehen direkt über den Diagrammen und werden im Portfolio
 gespeichert – jede Änderung rechnet sofort neu. Modell je Jahr:

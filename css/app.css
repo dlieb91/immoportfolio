@@ -655,6 +655,12 @@ table.data tbody tr:hover td.aktion { background: var(--surface-2); }
   background: var(--surface);
   box-shadow: inset 0 1px 0 var(--border-strong);
 }
+/* Eine Ansicht mit Scrollbehälter darf schmaler werden als ihre Tabelle.
+   Grid-Elemente schrumpfen sonst nie unter ihre Inhaltsbreite: Die breiteste
+   Tabelle – im Forecast „Jahr für Jahr" – weitete die ganze Spalte, und die
+   Seite war auf dem iPad rechts abgeschnitten, statt in der Tabelle zu
+   scrollen. Wirkt auf das Grid-Element selbst, auch wenn es ein Wrapper ist. */
+.view-inner > :has(.plan-scroll) { min-width: 0; }
 
 .leerstand-link {
   display: inline-block; margin-right: 12px;

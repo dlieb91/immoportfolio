@@ -257,6 +257,116 @@ export function darlehenKennzahlen(fin, stichtag, plan) {
   };
 }
 
+/* ---------- Anschlussfinanzierung ---------- */
+
+/** Volle Monate von einem Datum bis zu einem späteren (YYYY-MM-DD), nie negativ. */
+function monateZwischen(von, bis) {
+  const [j1, m1, t1] = von.split('-').map(Number);
+  const [j2, m2, t2] = bis.split('-').map(Number);
+  const m = (j2 - j1) * 12 + (m2 - m1) + (t2 > t1 ? 1 : 0);
+  return Math.max(0, m);
+}
+
+/**
+ * Anfänglicher Tilgungssatz in %, bei dem eine Annuität genau `rate` im Monat
+ * kostet – die Umkehrung von annuitaet().
+ */
+function tilgungFuerRate(betrag, zins, rate) {
+  return rate * 12 / betrag * 100 - zins;
+}
+
+/** Monatsrate, die `betrag` bei `zins` % in `monate` Monaten genau auf null bringt. */
+function rateFuerLaufzeit(betrag, zins, monate) {
+  const r = zins / 100 / 12;
+  if (!r) return betrag / monate;
+  return betrag * r / (1 - Math.pow(1 + r, -monate));
+}
+
+/**
+ * Wie es nach Ablauf der Zinsbindung weitergehen könnte.
+ *
+ * Gerechnet wird die Restschuld, die zum Bindungsende noch offen ist – jede
+ * Variante ist eine **neue Finanzierung über genau diesen Betrag**, ab dem
+ * Bindungsende, und läuft durch tilgungsplan(). Eine zweite Tilgungsformel
+ * neben der bestehenden gäbe zwei Wahrheiten über dieselbe Rate.
+ *
+ * Je angenommenem Zins drei Gestalten:
+ *   rate     – die heutige Rate bleibt, die Laufzeit gibt nach
+ *   tilgung  – der anfängliche Tilgungssatz bleibt, die Rate gibt nach
+ *   voll     – ein Zieljahr ist fest, die Rate richtet sich danach
+ *
+ * Der Zins bleibt je Variante bis zur Volltilgung gleich. Das ist keine
+ * Prognose, sondern die Frage „was wäre, wenn", die man vor dem Gespräch
+ * mit der Bank beantwortet haben möchte.
+ *
+ * @param fin       Finanzierungsobjekt
+ * @param plan      sein Tilgungsplan (wird übergeben, nicht neu gerechnet)
+ * @param opt.zinsen            angenommene Anschlusszinsen in %
+ * @param opt.volltilgungJahre  Zieldauer ab Bindungsende für die Variante „voll"
+ * @param opt.stichtag          heute (YYYY-MM-DD) – das Modul kennt keine Uhr
+ * @param opt.zinsHeute         aktueller Marktzins für neue Darlehen, für den
+ *                              Forward-Vergleich; leer = kein Vergleich
+ * @param opt.aufschlagMonat    Forward-Aufschlag in Prozentpunkten je Monat
+ *                              Vorlauf ab dem 13. Monat
+ * @returns null, wenn es nichts zu rechnen gibt (keine Zinsbindung, schon
+ *          abgelaufen, kein Betrag)
+ */
+export function anschlussVarianten(fin, plan, opt = {}) {
+  const { zinsen = [], volltilgungJahre = 20, stichtag, zinsHeute = null, aufschlagMonat = 0 } = opt;
+  const ende = fin?.zinsbindungBis;
+  if (!ende || !fin.betrag || !plan?.monate?.length || !stichtag) return null;
+  if (ende <= stichtag) return null;
+
+  const restschuld = restschuldZu(plan, ende, fin.betrag);
+  const monateBis = monateZwischen(stichtag, ende);
+  const basis = { restschuld, bindungsEnde: ende, monateBisBindungsende: monateBis, varianten: [], forward: null };
+  if (restschuld <= 0.005) return { ...basis, getilgt: true };
+
+  /* Heutige Rate: die im letzten Monat der Bindung. Der Anteil fürs
+     Ansparkonto gehört nicht dazu – er tilgt die Schuld ja nicht. */
+  const imBindungsende = plan.monate.filter((m) => m.datum <= ende).at(-1) || plan.monate[0];
+  const rateHeute = imBindungsende.rate - (imBindungsende.tilgungsersatz || 0);
+
+  const bauen = (zins, tilgungSatz) => {
+    const synth = {
+      betrag: restschuld, auszahlung: ende, sollzins: zins, tilgungAnfang: tilgungSatz,
+      art: 'annuitaet', sondertilgungen: [], zinsbindungBis: null,
+    };
+    const p = tilgungsplan(synth);
+    return {
+      zins, tilgungAnfang: tilgungSatz,
+      rate: p.rateStart, laufzeitMonate: p.laufzeitMonate,
+      zinsenGesamt: p.zinsenGesamt, volltilgung: p.volltilgung,
+    };
+  };
+
+  for (const zins of zinsen) {
+    const tilgRate = tilgungFuerRate(restschuld, zins, rateHeute);
+    basis.varianten.push(tilgRate > 0.005
+      ? { art: 'rate', moeglich: true, ...bauen(zins, tilgRate) }
+      : { art: 'rate', moeglich: false, zins, grund: 'Die heutige Rate deckt bei diesem Zins nur die Zinsen.' });
+
+    basis.varianten.push({ art: 'tilgung', moeglich: true, ...bauen(zins, fin.tilgungAnfang || 0) });
+
+    const n = Math.round(volltilgungJahre * 12);
+    if (n > 0) {
+      const r = rateFuerLaufzeit(restschuld, zins, n);
+      basis.varianten.push({ art: 'voll', moeglich: true, jahre: volltilgungJahre, ...bauen(zins, tilgungFuerRate(restschuld, zins, r)) });
+    }
+  }
+
+  /* Forward-Darlehen: Wer sich den Zins heute für später sichert, zahlt
+     einen Aufschlag je Monat Vorlauf, meist ab dem 13. Monat. Welches
+     Zinsniveau dann herrscht, weiß niemand – deshalb wird keine Empfehlung
+     abgegeben, sondern die Schwelle genannt: Liegt der Marktzins bei
+     Bindungsende über dem Forward-Zins, hat sich das Forward gelohnt. */
+  if (zinsHeute != null && aufschlagMonat > 0) {
+    const aufschlag = aufschlagMonat * Math.max(0, monateBis - 12);
+    basis.forward = { zinsHeute, aufschlag, forwardZins: zinsHeute + aufschlag, monateVorlauf: monateBis };
+  }
+  return basis;
+}
+
 /**
  * Prüft, ob die Sondertilgungen eines Jahres das vereinbarte Recht überschreiten.
  * Liefert die betroffenen Jahre.

@@ -100,6 +100,10 @@ export const einstellungen = {
       zahlFeld('Leerstandsquote', e, 'leerstandProzent', { suffix: '%', nachkomma: 1 }),
       zahlFeld('Inflation p. a.', e, 'inflation', { suffix: '%', nachkomma: 1 }),
       zahlFeld('Anschlusszins', e, 'anschlusszins', { suffix: '%', nachkomma: 2, hint: 'nach Ablauf der Zinsbindung' }),
+      zahlFeld('Forward-Aufschlag', e, 'forwardAufschlagMonat', {
+        suffix: '%-Pkt./Monat', nachkomma: 3,
+        hint: 'je Monat Vorlauf, ab dem 13. Monat – Richtwert der Banken, im Angebot nachsehen',
+      }),
     ]));
 
     /* --- Speicherung --- */

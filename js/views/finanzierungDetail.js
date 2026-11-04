@@ -3,7 +3,7 @@
 import { el, leeren, eur, num, datum, uid, heuteISO, toast, bestaetigen } from '../util.js';
 import { state, aendern, objekt as objektMit, verkehrswert } from '../store.js';
 import {
-  sondertilgungPruefen, MINDEST_TILGUNG, ersatzGuthabenZu, ersatzEingezahltBis,
+  sondertilgungPruefen, MINDEST_TILGUNG, ersatzGuthabenZu, ersatzEingezahltBis, anschlussVarianten,
 } from '../finanzmathematik.js';
 import {
   textFeld, zahlFeld, datumFeld, auswahlFeld, schalterFeld, textBereich,
@@ -14,6 +14,12 @@ import { DARLEHENSARTEN, finanzierungKennzahlen, balken } from './finanzierungen
 import { dokumenteKarte, protokollKarte, dokumenteEntfernenFuer } from './dokumente.js';
 
 let planAnsicht = 'jahre';   // jahre | monate
+
+/* Annahmen der Anschlussrechnung. Sie gehören zur Ansicht, nicht zum
+   Portfolio: Es sind Was-wäre-wenn-Werte, die niemand speichern will –
+   und über setzen() landeten sie im Protokoll. null = Vorgabe aus den
+   Einstellungen. */
+const anschlussAnnahme = { zins: null, jahre: 15, markt: null };
 
 export const finanzierungDetail = {
   render(container) {
@@ -40,13 +46,22 @@ export const finanzierungDetail = {
     const kpiBox = el('div', {}, [kennzahlen(fin)]);
     const planBox = el('div');
 
+    const anschlussBox = el('div');
+    const anschlussNeu = () => {
+      const k = anschlussKarte(fin, anschlussNeu);
+      leeren(anschlussBox);
+      if (k) anschlussBox.append(k);
+    };
+
     const planNeu = () => { leeren(planBox).append(tilgungsplanKarte(fin, planNeu)); };
     const obenNeu = () => {
       leeren(kopfBox).append(kopf(fin));
       leeren(kpiBox).append(kennzahlen(fin));
       planNeu();
+      anschlussNeu();
     };
     planNeu();
+    anschlussNeu();
 
     inner.append(kopfBox, kpiBox);
     // Zwei Rückmeldungen: reine Werte ziehen nur Kopf, Kennzahlen und Plan
@@ -55,6 +70,7 @@ export const finanzierungDetail = {
     inner.append(neuZeichnend((z) => konditionen(fin, obenNeu, () => { z(); obenNeu(); })));
     inner.append(neuZeichnend((z) => sondertilgungen(fin, () => { z(); obenNeu(); })));
     inner.append(planBox);
+    inner.append(anschlussBox);
     inner.append(neuZeichnend((z) => dokumenteKarte('finanzierung', fin.id, z)));
     inner.append(abschnitt('Notizen', null, textBereich(null, fin, 'notizen', {
       zeilen: 4, platzhalter: 'Vereinbarungen, Ansprechpartner, Bereitstellungszinsen …',
@@ -331,6 +347,130 @@ function sondertilgungen(fin, neuZeichnen) {
         neuZeichnen();
       },
     }, ['+ Sondertilgung']),
+  ]);
+}
+
+/* ---------- Anschlussfinanzierung ---------- */
+
+const VARIANTEN_TEXT = {
+  rate: () => 'Heutige Rate bleibt',
+  tilgung: (fin) => `Tilgung ${num(fin.tilgungAnfang || 0, 1)} % bleibt`,
+  voll: (fin, v) => `Volltilgung in ${num(v.jahre, 0)} Jahren`,
+};
+
+/**
+ * Was nach Ablauf der Zinsbindung käme – nur, solange die Bindung noch läuft.
+ * Danach gibt es nichts mehr durchzurechnen, und die Karte bleibt weg.
+ */
+function anschlussKarte(fin, neu) {
+  const e = state.daten.einstellungen;
+  const heute = heuteISO();
+  /* Dieselbe Rangfolge wie im Tilgungsplan: der Zins am Darlehen, sonst die
+     Vorgabe des Portfolios. Sonst rechnete die Karte mit einem anderen
+     Anschlusszins als der Plan direkt darüber. */
+  const vorgabeZins = fin.anschlusszins ?? e.anschlusszins ?? 4.5;
+  const basisZins = anschlussAnnahme.zins ?? vorgabeZins;
+  const zinsen = [basisZins - 1, basisZins, basisZins + 1].filter((z) => z >= 0);
+
+  const a = anschlussVarianten(fin, finanzierungKennzahlen(fin).plan, {
+    zinsen, volltilgungJahre: anschlussAnnahme.jahre || 15, stichtag: heute,
+    zinsHeute: anschlussAnnahme.markt ?? basisZins,
+    aufschlagMonat: e.forwardAufschlagMonat ?? 0,
+  });
+  if (!a) return null;
+
+  if (a.getilgt) {
+    return abschnitt('Anschlussfinanzierung', `Zinsbindung endet ${datum(a.bindungsEnde)}`, [
+      el('div.faint', { text: 'Bis zum Ende der Zinsbindung ist das Darlehen voll getilgt – es gibt nichts anzuschließen.', style: 'font-size:13px' }),
+    ]);
+  }
+
+  const feld = (label, key, { suffix, nachkomma = 2, platzhalter, hint }) => el('div.field', {}, [
+    el('label', { text: label }),
+    el('div.input-suffix', {}, [
+      el('input', {
+        type: 'text', inputmode: 'decimal', placeholder: platzhalter || '',
+        value: anschlussAnnahme[key] == null ? '' : num(anschlussAnnahme[key], nachkomma),
+        onchange: (ev) => { anschlussAnnahme[key] = parseZahl(ev.target.value); neu(); },
+      }),
+      el('span', { text: suffix }),
+    ]),
+    hint ? el('div.hint', { text: hint }) : null,
+  ]);
+
+  const zeilen = [];
+  for (const zins of zinsen) {
+    a.varianten.filter((v) => v.zins === zins).forEach((v, i) => {
+      const erste = i === 0;
+      zeilen.push(el('tr', {}, [
+        el('td.num', { text: erste ? num(zins, 2) + ' %' : '', style: erste ? 'font-weight:600' : '' }),
+        el('td', { text: VARIANTEN_TEXT[v.art](fin, v) }),
+        ...(v.moeglich
+          ? [
+              el('td.num', { text: eur(v.rate) }),
+              el('td.num', { text: `${num(v.laufzeitMonate / 12, 1)} J.` }),
+              el('td.num', { text: eur(v.zinsenGesamt, 0) }),
+            ]
+          : [el('td.faint', { colspan: '3', text: v.grund, style: 'font-size:12px' })]),
+      ]));
+    });
+  }
+
+  const f = a.forward;
+  const forwardText = f
+    ? `Forward-Darlehen: Wer sich den Zins heute sichert, zahlt bei ${f.monateVorlauf} Monaten Vorlauf `
+      + (f.aufschlag > 0
+        ? `${num(f.aufschlag, 2)} Prozentpunkte Aufschlag – also ${num(f.forwardZins, 2)} % statt ${num(f.zinsHeute, 2)} %. `
+        : 'noch keinen Aufschlag (er beginnt erst ab dem 13. Monat Vorlauf). ')
+      + `Liegt der Marktzins bei Bindungsende über ${num(f.forwardZins, 2)} %, hat sich das Forward gelohnt, `
+      + 'darunter wäre Abwarten günstiger gewesen. Wie sich der Zins entwickelt, kann die App nicht wissen.'
+    : null;
+
+  const ohneTilgung = fin.art === 'endfaellig' || fin.mitTilgungsersatz;
+
+  return el('div.card', {}, [
+    el('div.card-head', {}, [
+      el('div', {}, [
+        el('h2', { text: 'Anschlussfinanzierung' }),
+        el('div.sub', {
+          text: `Zinsbindung endet ${datum(a.bindungsEnde)} · noch ${a.monateBisBindungsende} Monate`
+            + ` · Restschuld dann ${eur(a.restschuld, 0)}`,
+        }),
+      ]),
+    ]),
+    el('div.card-body', {}, [
+      felderGitter([
+        // Nicht „Anschlusszins": So heißt das Feld am Darlehen weiter oben auf der Seite.
+        feld('Angenommener Zins', 'zins', {
+          suffix: '%', platzhalter: num(vorgabeZins, 2),
+          hint: 'Mitte der Rechnung, darum ± 1 Prozentpunkt',
+        }),
+        feld('Volltilgung nach', 'jahre', { suffix: 'Jahren', nachkomma: 0, hint: 'ab Bindungsende' }),
+        feld('Marktzins heute', 'markt', {
+          suffix: '%', platzhalter: num(basisZins, 2), hint: 'für den Forward-Vergleich',
+        }),
+      ]),
+      el('div.plan-scroll', { style: 'margin-top:14px' }, [
+        el('table.data.kompakt', {}, [
+          el('thead', {}, [el('tr', {}, [
+            el('th', { style: 'text-align:right', text: 'Zins' }),
+            el('th', { text: 'Variante' }),
+            el('th', { style: 'text-align:right', text: 'Rate' }),
+            el('th', { style: 'text-align:right', text: 'Laufzeit' }),
+            el('th', { style: 'text-align:right', text: 'Zinsen gesamt' }),
+          ])]),
+          el('tbody', {}, zeilen),
+        ]),
+      ]),
+      forwardText ? hinweis(forwardText) : null,
+      hinweis('Gerechnet wird die Restschuld zum Bindungsende, mit gleichbleibendem Zins bis zur Volltilgung '
+        + 'und ohne Sondertilgungen. Bearbeitungsgebühr und Vorfälligkeitsentschädigung sind nicht enthalten. '
+        + (ohneTilgung
+          ? '<strong>Dieses Darlehen tilgt nicht:</strong> die Restschuld bleibt bis zum Bindungsende stehen, '
+            + 'das angesparte Guthaben ist hier nicht gegengerechnet. '
+          : '')
+        + 'Eine Entscheidungshilfe, keine Finanzberatung.'),
+    ]),
   ]);
 }
 

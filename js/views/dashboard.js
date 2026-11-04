@@ -8,6 +8,8 @@ import {
 import { prognose, basisParameter } from '../forecast.js';
 import { erhaltungsAmpel, spekulationsfrist } from '../buchhaltung.js';
 import { erhoehbareVertraege, anstehendeAnpassungen } from '../mieterhoehung.js';
+import { liquiditaetsvorschau } from '../liquiditaet.js';
+import { laufenderMonat } from '../zahlungen.js';
 import { speicher } from '../storage.js';
 
 export const dashboard = {
@@ -366,7 +368,9 @@ function warnungen() {
   const bindungen = d.finanzierungen.filter((f) => f.zinsbindungBis && f.zinsbindungBis >= heute && f.zinsbindungBis <= grenze);
   if (bindungen.length) {
     punkte.push({
-      art: 'warn', ziel: '#/finanzierungen',
+      /* Bei genau einer Bindung führt der Hinweis gleich zur Karte
+         „Anschlussfinanzierung" – bei mehreren zur Übersicht. */
+      art: 'warn', ziel: bindungen.length === 1 ? `#/finanzierung?id=${bindungen[0].id}` : '#/finanzierungen',
       text: `${bindungen.length} Zinsbindung${bindungen.length === 1 ? '' : 'en'} laufen in den nächsten 2 Jahren aus`,
       detail: bindungen.map((f) => `${f.bank || 'Darlehen'} bis ${datum(f.zinsbindungBis)}`).join(', '),
     });
@@ -408,6 +412,19 @@ function warnungen() {
       detail: pk.rueckstandSeit
         ? `offen seit ${monatKurz(pk.rueckstandSeit)} · zählt weder im Cashflow noch als Einnahme`
         : 'zählt weder im Cashflow noch als Einnahme',
+    });
+  }
+
+  /* Liquidität: Wie viel Reserve braucht es in den nächsten zwölf Monaten?
+     Nur eine Information – bei einem Portfolio mit negativem Cashflow steht
+     sie dauerhaft da, und das ist richtig so: Sie nennt die Zahl, die man
+     sonst im Kopf überschlagen müsste. Die Monate stehen im Forecast. */
+  const lq = liquiditaetsvorschau(laufenderMonat(), 12);
+  if (lq.bedarf > 0.5) {
+    punkte.push({
+      art: 'info', ziel: '#/forecast',
+      text: `Liquiditätsbedarf ${eur(lq.bedarf, 0)} bis ${monatKurz(lq.tiefpunkt.periode)}`,
+      detail: 'so viel Reserve braucht es in den nächsten zwölf Monaten, vor Steuern · die Monate stehen im Forecast',
     });
   }
 
