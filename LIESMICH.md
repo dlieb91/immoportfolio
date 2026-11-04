@@ -256,6 +256,7 @@ werden bewusst nicht verglichen; die laufen auf zwei Geräten ohnehin auseinande
 | 20 | Programmdateien erneuern sich zuverlässig (Zwischenspeicher) | fertig |
 | 21 | Anschlussfinanzierung: Varianten und Forward-Schwelle nach Ablauf der Zinsbindung | fertig |
 | 22 | Liquiditätsvorschau über zwölf Monate | fertig |
+| 23 | Schreiben an den Mieter: Verlangen (§ 558), Indexerklärung (§ 557b), Ankündigung der Staffel | fertig |
 
 ## Aufbau des Codes
 
@@ -277,6 +278,7 @@ js/speicher/dropbox.js      Ablage Dropbox: lokal zuerst, Abgleich daneben
 js/speicher/dropboxApi.js   Dropbox-Anmeldung (PKCE) und REST-Aufrufe
 js/abgleich.js       wann abgeglichen wird, Konfliktdialog, Statusanzeige
 js/mieterhoehung.js  Spielraum nach § 558 BGB (rein, ohne Oberfläche)
+js/schreiben.js      Textbausteine der Mieterhöhungs-Schreiben (rein, ohne Oberfläche)
 js/store.js          Datenmodell, Zustand, Berechnungen
 js/finanzmathematik.js  Tilgungsrechnung (rein, ohne Oberfläche)
 js/liquiditaet.js    Liquiditätsvorschau über zwölf Monate (rein, ohne Oberfläche)
@@ -678,8 +680,9 @@ als Mietanpassung ein.
 > Zugang. Ohne diese Erklärung bleibt die alte Miete geschuldet. Das ist keine Höflichkeit,
 > sondern Wirksamkeitsvoraussetzung, und die App weist bei jedem Schritt darauf hin.
 
-Bei beiden Formen sind Erhöhungen nach § 558 (Vergleichsmiete) daneben ausgeschlossen. Die
-App verfasst **keine Schreiben** – sie rechnet die Beträge und erinnert an die Fristen.
+Bei beiden Formen sind Erhöhungen nach § 558 (Vergleichsmiete) daneben ausgeschlossen. Zu jeder
+der drei Formen setzt die App auf Wunsch ein **Schreiben** auf, siehe *Schreiben an den Mieter*
+weiter unten.
 
 **Mieterhöhung.** Jeder Mietvertrag zeigt den Spielraum bis zur ortsüblichen
 Vergleichsmiete nach § 558 BGB. Drei Schranken gelten gleichzeitig:
@@ -701,9 +704,58 @@ Bei **Staffel- und Indexmiete** entfällt das: Dort ist § 558 ausgeschlossen (�
 Spielraum erst, wenn die Sperrfrist in den nächsten drei Monaten abläuft – vorher ließe sich
 ohnehin nichts durchsetzen.
 
-**Eine Abschätzung, kein Erhöhungsschreiben.** Form und Begründung des Verlangens regelt
-§ 558a BGB, Modernisierungen § 559 BGB, die Mietpreisbremse bei Neuvermietung § 556d BGB –
-nichts davon rechnet die App.
+**Modernisierung und Mietpreisbremse bleiben außen vor.** Modernisierungsumlagen (§ 559 BGB)
+und die Mietpreisbremse bei Neuvermietung (§ 556d BGB) rechnet die App nicht – weder die
+Spielraum-Karte noch das Schreiben.
+
+### Schreiben an den Mieter
+
+Auf der Karte *Mieterhöhung*, *Indexmiete* oder *Staffelmiete* öffnet **Schreiben erstellen** einen
+druckfertigen Entwurf. Die App **verschickt nichts** – sie setzt den Text auf, aus den Beträgen
+und Fristen, die die Karte schon rechnet; eine zweite Rechnung gibt es nicht. Gedruckt wird auf
+A4 im Hochformat, das Anschriftfeld ist an DIN 5008 angelehnt (Fensterkuvert, aber ohne
+Gewähr: Drucker und Umschlag unterscheiden sich). Dein Name und deine Anschrift als Absender
+stehen unter *Einstellungen → Vermieter*.
+
+Die drei Formen sind rechtlich grundverschieden, und die Schreiben sind es auch:
+
+| | Verlangen nach § 558 | Indexerklärung nach § 557b | Staffel nach § 557a |
+|---|---|---|---|
+| Braucht der Mieter zuzustimmen? | **ja** | nein | nein |
+| Form | Textform **und Begründung** (§ 558a) | Textform, Pflichtinhalt | keine – die Staffel wirkt kraft Vertrag |
+| Pflichtinhalt | Begründung, hier der Mietspiegel | Indexänderung **und** Miete als Geldbetrag | – |
+| Wirksam ab | Beginn des dritten Kalendermonats nach Zugang | Beginn des übernächsten Monats nach Zugang | zum vereinbarten Termin |
+| Das Schreiben ist | das Verlangen selbst, mit einer Seite für die Zustimmung | die Erklärung selbst | eine **Höflichkeit**, und der Text sagt es |
+
+Was die App dabei **nicht** durchgehen lässt:
+
+- **Kein Brief ohne Pflichtangaben.** Fehlen Absender oder – beim Verlangen – die
+  Vergleichsmiete der Einheit, gibt es nur den Hinweis, was fehlt. Ein Brief ohne sie sähe
+  fertig aus und wäre es nicht.
+- **Nicht versandfertig** (Knopf *Drucken* gesperrt, der Brief steht trotzdem): die Fundstelle
+  des Mietspiegels fehlt, das Verlangen käme zu früh (frühestens ein Jahr nach der letzten
+  Mietänderung), die gewünschte Miete liegt über der Obergrenze, die Objektanschrift fehlt.
+- **Die Bezugsmiete der Kappungsgrenze gehört zum Datum des Briefs.** Sie ist die Miete drei
+  Jahre vor dem Wirksamwerden *dieses* Schreibens, nicht des frühestmöglichen Termins – hat
+  sich die Miete dazwischen geändert, nennte der Brief sonst eine Zahl, die nicht zu seinem
+  Datum gehört.
+
+Das Briefdatum, die Fundstelle des Mietspiegels und eine Wunschmiete unterhalb der Obergrenze
+trägst du auf der Seite ein; sie bleiben dort und kommen **nicht** ins Portfolio. Nur die
+Fundstelle merkt sich das Gerät, denn sie bleibt von Brief zu Brief dieselbe.
+
+**Fristen laufen ab Zugang, nicht ab Briefdatum.** Die App rechnet vom Briefdatum; kommt das
+Schreiben erst im nächsten Kalendermonat an, verschiebt sich alles um einen Monat. Wer den
+Zugang beweisen muss, übergibt persönlich gegen Quittung oder lässt einen Einwurf
+dokumentieren.
+
+**Bei der Indexerklärung: erst das Schreiben, dann eintragen.** *Als Mietanpassung eintragen*
+setzt den Basis-Indexstand auf den neuen Wert; danach fehlt dem Schreiben der alte.
+
+**Ein Textbaustein, keine Rechtsberatung.** Ob die Voraussetzungen im Einzelfall vorliegen, prüft
+die App nicht – ob der Mietspiegel zur Wohnung passt (Baujahr, Ausstattung, Lage), ob die
+Kappungsgrenze am Ort 15 oder 20 % beträgt, ob frühere Erhöhungen nach §§ 559, 560 BGB die
+Rechnung verschieben. Im Zweifel fragt man den Mieterverein, Haus & Grund oder eine Anwältin.
 
 **Zahlungseingang.** Abgeleitete Mieten und Nebenkosten gelten zunächst als geflossen – so
 war es immer, und solange du nichts abhakst, ändert sich nichts. Über den Knopf in der

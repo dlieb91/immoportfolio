@@ -910,3 +910,67 @@ body.touch table.data td select { min-height: 38px; font-size: 16px; }
 
 /* Briefkopf des Ausdrucks – am Bildschirm unsichtbar, siehe css/druck.css. */
 .druckkopf { display: none; }
+
+/* ---------- Schreiben an den Mieter ----------
+   Eine eigene Seite über der App, keine Ansicht: ein Brief ist ein Vorgang.
+   Ebene 120 – über der App, unter Dialogen (150) und Hinweisen (200). */
+
+.brief-ansicht {
+  position: fixed; inset: 0; z-index: 120;
+  background: var(--bg);
+  overflow: auto; -webkit-overflow-scrolling: touch;
+}
+.brief-leiste {
+  position: sticky; top: 0; z-index: 2;
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 16px;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+}
+.brief-titel { flex: 1; font-weight: 600; min-width: 0; }
+.brief-spalte { max-width: 860px; margin: 0 auto; padding: 16px 16px 48px; display: grid; gap: 16px; }
+/* Grid-Elemente schrumpfen sonst nie unter ihre Inhaltsbreite. */
+.brief-spalte > * { min-width: 0; }
+
+/* Das Papier ist immer weiß mit dunkler Schrift, auch im dunklen Thema:
+   es zeigt, wie der Brief gedruckt aussieht. Deshalb feste Farben statt
+   der Variablen. Maße in mm, damit Bildschirm und Druck zusammenpassen. */
+.brief {
+  background: #fff; color: #16181d;
+  width: 100%; max-width: 210mm; box-sizing: border-box;
+  margin: 0 auto; padding: 20mm 18mm 24mm 22mm;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, .35);
+  font-size: 11pt; line-height: 1.5;
+}
+.brief p { margin: 0 0 10px; }
+.brief h3 { font-size: 11pt; margin: 14px 0 4px; }
+.brief-kopf { display: flex; justify-content: space-between; gap: 24px; margin-bottom: 14mm; }
+.brief-anschrift { min-width: 85mm; min-height: 40mm; }
+.brief-absenderzeile {
+  font-size: 7.5pt; color: #55595f;
+  border-bottom: .5pt solid #55595f; padding-bottom: 1mm; margin-bottom: 3mm;
+}
+.brief-datum { text-align: right; white-space: nowrap; }
+.brief-betreff { font-weight: 700; margin-bottom: 8mm; }
+.brief-tabelle { border-collapse: collapse; margin: 4px 0 12px; min-width: 60%; }
+.brief-tabelle td { padding: 3px 0; border-bottom: .5pt dotted #8a8d92; }
+.brief-tabelle td.num { text-align: right; padding-left: 24px; white-space: nowrap; }
+.brief-tabelle tr.brief-fett td { font-weight: 700; }
+.brief-gruss { margin-top: 10px; }
+.brief-unterschrift { margin-top: 16mm; }
+.brief-zustimmung {
+  margin-top: 14mm; padding-top: 6mm;
+  border-top: 1px dashed #777; break-inside: avoid;
+}
+.brief-zustimmung-titel { font-weight: 700; margin-bottom: 4px; }
+.brief-zustimmung-an { font-size: 9pt; color: #55595f; margin-bottom: 10px; }
+.brief-schluss { break-inside: avoid; page-break-inside: avoid; }
+.brief-vor-schluss { break-after: avoid; page-break-after: avoid; break-inside: avoid; page-break-inside: avoid; }
+.brief-zeilen { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 14mm; }
+.brief-zeilen > div { border-top: .5pt solid #333; padding-top: 2px; font-size: 8.5pt; color: #444; }
+
+@media (max-width: 700px) {
+  .brief { padding: 12mm 8mm 14mm; }
+  .brief-kopf { flex-direction: column; gap: 8px; }
+  .brief-anschrift { min-width: 0; min-height: 0; }
+  .brief-datum { text-align: left; }
+}

@@ -222,3 +222,40 @@ table.data tr { break-inside: avoid; page-break-inside: avoid; }
 .druck-neue-seite { break-before: page; page-break-before: always; }
 .druck-weg { display: none !important; }
 h2, h3 { break-after: avoid; page-break-after: avoid; }
+
+/* ---------- Brief ----------
+   Beim Drucken eines Schreibens (body.druck-brief) bleibt nur das Papier:
+   keine App, kein Druckkopf – ein Brief trägt seinen eigenen Kopf. Der
+   Druckkopf liegt in .app und verschwindet mit ihr. */
+
+body.druck-brief { height: auto !important; }
+body.druck-brief .app,
+body.druck-brief .brief-bildschirm { display: none !important; }
+
+body.druck-brief .brief-ansicht {
+  position: static !important; overflow: visible !important;
+  inset: auto; background: #fff;
+}
+body.druck-brief .brief-spalte { display: block; max-width: none; padding: 0; }
+
+/* Oberkante des Anschriftfelds bei 45 mm (DIN 5008): 16 mm Seitenrand plus
+   29 mm hier. Links 25 mm, rechts 20 mm. */
+body.druck-brief .brief {
+  max-width: none; width: auto; margin: 0;
+  padding: 29mm 6mm 0 11mm;
+  box-shadow: none; font-size: 11pt;
+}
+/* Das Anschriftfeld braucht höchstens fünf Zeilen; 40 mm Mindesthöhe verschenkten Platz. */
+body.druck-brief .brief-kopf { margin-bottom: 8mm; }
+body.druck-brief .brief-anschrift { min-height: 30mm; }
+body.druck-brief .brief-betreff { margin-bottom: 6mm; }
+body.druck-brief .brief { font-size: 10.5pt; line-height: 1.42; }
+body.druck-brief .brief-unterschrift { margin-top: 10mm; }
+
+/* Die Zustimmung ist eine Anlage und gehört auf ein eigenes Blatt: Der Mieter
+   schickt genau dieses Blatt zurück, ohne den Brief mitzukopieren. */
+body.druck-brief .brief-zustimmung {
+  break-before: page; page-break-before: always;
+  margin-top: 0; padding-top: 29mm; border-top: none;
+}
+body.druck-brief .brief-zustimmung p { margin-top: 8mm; }

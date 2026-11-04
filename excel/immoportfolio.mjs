@@ -2443,6 +2443,7 @@ function blattUebersicht(jahr) {
   punkt('Platz', `${OBJEKTE} Objekte, ${EINHEITEN} Einheiten, ${VERTRAEGE} Mietverträge mit je ${KONDITIONEN} Konditionen, ${DARLEHEN} Darlehen, ${SONDER} Sondertilgungen.`);
   punkt('Zeitraum', `Die Prognose reicht ${JAHRE} Jahre. Ein Tilgungsplan wird über ${MONATE / 12} Jahre ab seiner Auszahlung gerechnet – für ein Darlehen, das lange vor dem Jahr der Mappe ausgezahlt wurde, kann das am Ende der Prognose knapp werden. Das Dashboard sagt es, wenn es so ist.`);
   punkt('Ein Verkehrswert je Objekt', 'Keine Werthistorie, ein Feld für aktivierte Modernisierungen statt einer Liste.');
+  punkt('Nur Rechnung, keine Entscheidungshilfen', 'Anschlussfinanzierung, Liquiditätsvorschau über zwölf Monate und die Schreiben an Mieter gibt es nur in der App. Sie sind Entscheidungshilfen und Textbausteine, keine gespeicherten Werte – diese Mappe bildet deshalb nichts davon ab, und keine ihrer Zahlen hängt daran.');
   punkt('Keine 15-%-Prüfung', 'Das Feld Modernisierung ist der Betrag, der die AfA-Bemessungsgrundlage erhöht – bereits entschieden. Ob eine Sanierung der ersten drei Jahre sofort abziehbar ist oder nach § 6 Abs. 1 Nr. 1a EStG in die AfA kippt, rechnet die App; diese Mappe übernimmt das Ergebnis.');
   punkt('Keine Anhänge', 'Bilder, Dokumente und das Änderungsprotokoll bleiben Sache der App.');
 

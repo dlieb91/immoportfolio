@@ -251,6 +251,48 @@ export function textBereich(label, obj, key, opts = {}) {
   return huelle(label, ta, opts.hint);
 }
 
+/**
+ * Zahl für ein Eingabefeld, deutsch geschrieben. Auf die gewünschten
+ * Nachkommastellen gerundet – es sei denn, das veränderte den Wert: Wer
+ * 4,625 eingibt, soll nicht 4,63 sehen und trotzdem mit 4,625 rechnen.
+ */
+function zahlAnzeige(wert, nachkomma) {
+  if (wert == null) return '';
+  const gerundet = num(wert, nachkomma);
+  const zurueck = Number(gerundet.replace(/\./g, '').replace(',', '.'));
+  return Math.abs(zurueck - wert) < 1e-9 ? gerundet : String(wert).replace('.', ',');
+}
+
+/**
+ * Eingabefeld, das **nur in der Ansicht lebt**.
+ *
+ * Alle anderen Felder hier schreiben über setzen() ins Portfolio – und damit
+ * in die Datei und ins Änderungsprotokoll. Für Was-wäre-wenn-Werte (die
+ * Annahmen einer Anschlussrechnung) und für die Angaben zu einem Brief ist das
+ * falsch: Niemand will sie speichern, und sie gehörten nicht ins Protokoll.
+ * Der Aufrufer hält den Wert selbst und bekommt ihn über `nach` zurück.
+ *
+ * typ: 'zahl' (deutsch geschrieben, parseZahl) | 'text' | 'datum'
+ */
+export function ansichtsFeld({ label, typ = 'zahl', wert, nachkomma = 2, suffix, hint, platzhalter, nach }) {
+  const anzeige = typ === 'zahl' ? zahlAnzeige(wert, nachkomma) : (wert ?? '');
+  const input = el('input', {
+    type: typ === 'datum' ? 'date' : 'text',
+    inputmode: typ === 'zahl' ? 'decimal' : null,
+    placeholder: platzhalter || '',
+    value: anzeige,
+    onchange: (e) => {
+      if (typ === 'zahl') return nach(parseZahl(e.target.value));
+      const v = e.target.value || null;
+      // Beim Tippen meldet der Browser jede Zwischenstufe der Jahreszahl, siehe datumFeld().
+      if (typ === 'datum' && v && !plausiblesDatum(v)) return;
+      nach(v);
+    },
+  });
+  const control = suffix ? el('div.input-suffix', {}, [input, el('span', { text: suffix })]) : input;
+  return huelle(label, control, hint);
+}
+
 /** Reines Anzeigefeld fuer berechnete Werte. */
 export function anzeigeFeld(label, wert, opts = {}) {
   return el('div.field', {}, [
@@ -280,9 +322,13 @@ export function abschnitt(titel, sub, inhalt, hinweisHtml) {
   ]);
 }
 
-export function hinweis(html) {
-  return el('div.note', { style: 'margin-bottom:16px' }, [
-    el('div.note-icon', { html: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>' }),
+export function hinweis(html, art) {
+  // art 'warn': dieselbe Karte in der Warnfarbe, mit Warndreieck statt Infokreis
+  const warn = art === 'warn';
+  return el('div.note' + (warn ? '.note-warn' : ''), { style: 'margin-bottom:16px' }, [
+    el('div.note-icon', { html: warn
+      ? '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>'
+      : '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>' }),
     el('div', { html }),
   ]);
 }

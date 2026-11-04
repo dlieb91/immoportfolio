@@ -9,7 +9,7 @@ import {
 import { speicherWarnung } from '../speicher/lokal.js';
 import { abmeldenUndLeeren } from '../speicher/dropbox.js';
 import { jetztAbgleichen } from '../abgleich.js';
-import { textFeld, zahlFeld, auswahlFeld, schalterFeld, felderGitter, hinweis } from '../felder.js';
+import { textFeld, textBereich, zahlFeld, auswahlFeld, schalterFeld, felderGitter, hinweis } from '../felder.js';
 import { protokollKarte } from './dokumente.js';
 
 function abschnitt(titel, sub, felder, hinweisHtml) {
@@ -69,6 +69,14 @@ export const einstellungen = {
 
     inner.append(abschnitt('Portfolio', 'Bezeichnung dieses Portfolios', [
       textFeld('Name', d.meta, 'name', { platzhalter: 'Mein Portfolio' }),
+    ]));
+
+    inner.append(abschnitt('Vermieter', 'Absender der Schreiben an Mieter', [
+      textFeld('Name', e, 'vermieterName', { platzhalter: 'Vor- und Nachname' }),
+      textBereich('Anschrift', e, 'vermieterAnschrift', {
+        zeilen: 3, platzhalter: 'Straße und Hausnummer\nPLZ Ort', protokollLabel: 'Anschrift des Vermieters',
+        hint: 'steht im Briefkopf von Mieterhöhungs-Schreiben, jede Zeile für sich',
+      }),
     ]));
 
     inner.append(abschnitt('Steuern', 'Grundlage für die Nachsteuer-Betrachtung – pro Objekt überschreibbar', [

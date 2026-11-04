@@ -16,6 +16,7 @@ import {
   STAFFEL_MINDEST_MONATE,
 } from '../mieterhoehung.js';
 import { hinweis } from '../felder.js';
+import { briefOeffnen } from './schreiben.js';
 import { dokumenteKarte, protokollKarte, dokumenteEntfernenFuer } from './dokumente.js';
 
 export const mietvertragDetail = {
@@ -413,6 +414,14 @@ function staffelKarte(mv) {
     ]));
   }
 
+  if (kommend.length) {
+    inhalt.push(el('button.btn', {
+      type: 'button', style: 'margin-top:10px',
+      onclick: () => briefOeffnen(mv.id, 'staffel'),
+      title: 'Ein Entwurf, den du an den Mieter schicken kannst – rechtlich nicht nötig, aber höflich',
+    }, ['Ankündigung erstellen']));
+  }
+
   return abschnitt('Mietanpassung', 'Staffelmiete nach § 557a BGB', inhalt,
     'Während einer Staffelmiete sind Erhöhungen nach § 558 (Vergleichsmiete) und § 559 '
     + '(Modernisierung) <strong>ausgeschlossen</strong>. Die Vereinbarung muss schriftlich im '
@@ -444,7 +453,7 @@ function indexKarte(mv, neuZeichnen) {
   }
 
   const standFeld = el('input', {
-    type: 'text', inputmode: 'decimal', value: indexStandEingabe ?? '',
+    type: 'text', inputmode: 'decimal', value: indexStandEingabe == null ? '' : String(indexStandEingabe).replace('.', ','),
     placeholder: 'z. B. 118,4',
     onchange: (ev) => { indexStandEingabe = parseZahl(ev.target.value); neuZeichnen(); },
   });
@@ -479,17 +488,26 @@ function indexKarte(mv, neuZeichnen) {
   if (r.grund) inhalt.push(el('div.hint', { style: 'padding:8px 0', text: r.grund }));
 
   if (r.moeglich) {
-    inhalt.push(el('button.btn.btn-primary', {
-      type: 'button', style: 'margin-top:10px',
-      onclick: () => indexUebernehmen(mv, r, neuZeichnen),
-    }, ['Als Mietanpassung eintragen']));
+    /* Reihenfolge: erst das Schreiben, dann eintragen. Das Eintragen setzt den
+       Basis-Indexstand auf den neuen Wert, danach fehlt dem Schreiben der alte. */
+    inhalt.push(el('div', { style: 'display:flex;gap:10px;flex-wrap:wrap;margin-top:10px' }, [
+      el('button.btn.btn-primary', {
+        type: 'button',
+        onclick: () => briefOeffnen(mv.id, 'index', { neuerStand: indexStandEingabe }),
+      }, ['Schreiben erstellen']),
+      el('button.btn', {
+        type: 'button',
+        onclick: () => indexUebernehmen(mv, r, neuZeichnen),
+      }, ['Als Mietanpassung eintragen']),
+    ]));
   }
 
   return abschnitt('Mietanpassung', 'Indexmiete nach § 557b BGB', inhalt,
     'Die Erhöhung wird <strong>nur durch Erklärung in Textform</strong> wirksam – ohne sie bleibt '
     + 'die alte Miete geschuldet. In der Erklärung müssen die eingetretene Indexänderung und die '
     + 'neue Miete oder die Erhöhung als Geldbetrag stehen. Erhöhungen nach § 558 BGB sind daneben '
-    + 'ausgeschlossen. Diese Karte rechnet den Betrag – das Schreiben verfasst sie nicht.');
+    + 'ausgeschlossen. „Schreiben erstellen“ setzt die Erklärung auf – erst danach „Als Mietanpassung '
+    + 'eintragen“, denn das Eintragen ersetzt den Basis-Indexstand.');
 }
 
 /** Traegt die errechnete Miete als neue Kondition ein, zum zulaessigen Termin. */
@@ -523,9 +541,9 @@ async function indexUebernehmen(mv, r, neuZeichnen) {
 /**
  * Zeigt den Spielraum bis zur ortsüblichen Vergleichsmiete.
  *
- * Bewusst eine Abschätzung und kein Erhöhungsschreiben: Form und Begründung
- * des Verlangens regelt § 558a, Modernisierungsumlagen § 559 – beides steht
- * hier nicht zur Debatte. Der Hinweis am Fuß sagt das.
+ * Eine Abschätzung. Das Schreiben dazu erzeugt briefOeffnen() – dort stehen
+ * Form und Begründung (§ 558a), die diese Karte nicht prüft. Modernisierungs-
+ * umlagen (§ 559) sind weiterhin nicht Gegenstand.
  */
 function mieterhoehungKarte(mv, neu) {
   const p = mieterhoehungsPotenzial(mv);
@@ -599,9 +617,17 @@ function mieterhoehungKarte(mv, neu) {
     ]));
   }
 
+  if (p.moeglich) {
+    inhalt.push(el('button.btn.btn-primary', {
+      type: 'button', style: 'margin-top:10px',
+      onclick: () => briefOeffnen(mv.id, 'verlangen'),
+    }, ['Schreiben erstellen']));
+  }
+
   return abschnitt('Mieterhöhung', 'Spielraum nach § 558 BGB', inhalt,
-    'Eine Abschätzung, <strong>kein Erhöhungsschreiben</strong>. Form und Begründung des '
-    + 'Verlangens regelt § 558a BGB, Modernisierungen § 559 BGB. Die Kappungsgrenze liegt bei '
+    'Eine Abschätzung; das Schreiben dazu entsteht über „Schreiben erstellen“ als Entwurf. Es braucht '
+    + 'die Vergleichsmiete der Einheit und deine Anschrift als Absender (Einstellungen). Form und Begründung '
+    + 'des Verlangens regelt § 558a BGB, Modernisierungen § 559 BGB. Die Kappungsgrenze liegt bei '
     + '20 %, in Gebieten mit angespanntem Wohnungsmarkt bei 15 % – welche gilt, sagt die '
     + 'Verordnung deines Landes; abweichend eintragen kannst du sie am Objekt.');
 }

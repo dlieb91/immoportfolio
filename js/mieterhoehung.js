@@ -24,7 +24,7 @@
    bei Neuvermietung (§ 556d) und die Formvorschriften des Erhöhungs-
    verlangens. Das ist eine Abschätzung des Spielraums, kein Schreiben. */
 
-import { heuteISO, datumPlus } from './util.js';
+import { heuteISO, datumPlus, datum } from './util.js';
 import { state, vertragStatus, einheitMit, objektVonEinheit } from './store.js';
 
 /** Kondition, die an einem Stichtag galt – oder null, wenn es keine gibt. */
@@ -233,7 +233,7 @@ export function indexAnpassung(mv, neuerStand, stichtag = heuteISO()) {
     ...basisInfo, neuerStand, veraenderungProzent, neueMiete, erhoehung,
     moeglich: !gesperrt && erhoehung > 0.005,
     grund: gesperrt
-      ? 'Die Miete muss zwölf Monate unverändert gelten – frühestens ab ' + fruehestensAb + '.'
+      ? 'Die Miete muss zwölf Monate unverändert gelten – frühestens ab ' + datum(fruehestensAb) + '.'
       : erhoehung > 0.005 ? null : 'Der Index ist nicht gestiegen, es ergibt sich keine Erhöhung.',
   };
 }

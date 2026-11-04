@@ -28,6 +28,11 @@ export const STANDARD_EINSTELLUNGEN = {
   anschlusszins: 4.5,         // % nach Ablauf der Zinsbindung
   // Forward-Darlehen: Zinsaufschlag in Prozentpunkten je Monat Vorlauf, ab dem 13. Monat
   forwardAufschlagMonat: 0.02,
+  // Absender der Mieterhöhungs-Schreiben. Bewusst zwei flache Felder: Ein verschachteltes
+  // Standardobjekt würde beim flachen Kopieren von allen Portfolios geteilt und beim
+  // Tippen verändert. Fehlende Felder füllt laden() mit diesen Vorgaben auf.
+  vermieterName: '',
+  vermieterAnschrift: '',
   verkaufNachJahren: null,    // Verkaufsszenario im Forecast, leer = kein Verkauf
   verkaufskosten: 3.0,        // % vom Verkaufserlös
   // Nur Vorbelegung beim Anlegen eines Objekts – erfasst wird je Objekt.

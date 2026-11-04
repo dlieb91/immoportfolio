@@ -7,7 +7,7 @@ import {
 } from '../finanzmathematik.js';
 import {
   textFeld, zahlFeld, datumFeld, auswahlFeld, schalterFeld, textBereich,
-  anzeigeFeld, felderGitter, abschnitt, hinweis, parseZahl,
+  anzeigeFeld, felderGitter, abschnitt, hinweis, parseZahl, ansichtsFeld,
   tabellenDatum, tabellenZahl, tabellenText,
 } from '../felder.js';
 import { DARLEHENSARTEN, finanzierungKennzahlen, balken } from './finanzierungen.js';
@@ -385,18 +385,10 @@ function anschlussKarte(fin, neu) {
     ]);
   }
 
-  const feld = (label, key, { suffix, nachkomma = 2, platzhalter, hint }) => el('div.field', {}, [
-    el('label', { text: label }),
-    el('div.input-suffix', {}, [
-      el('input', {
-        type: 'text', inputmode: 'decimal', placeholder: platzhalter || '',
-        value: anschlussAnnahme[key] == null ? '' : num(anschlussAnnahme[key], nachkomma),
-        onchange: (ev) => { anschlussAnnahme[key] = parseZahl(ev.target.value); neu(); },
-      }),
-      el('span', { text: suffix }),
-    ]),
-    hint ? el('div.hint', { text: hint }) : null,
-  ]);
+  const feld = (label, key, opt) => ansichtsFeld({
+    label, ...opt, wert: anschlussAnnahme[key],
+    nach: (v) => { anschlussAnnahme[key] = v; neu(); },
+  });
 
   const zeilen = [];
   for (const zins of zinsen) {
