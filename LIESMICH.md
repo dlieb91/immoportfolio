@@ -336,6 +336,9 @@ excel/               eigenständige Node-Skripte, die die Tabellenfassung
 **Objekt anlegen:** Objekte → „+ Objekt" → Eckdaten eingeben → du landest direkt im Objekt.
 Alles wird beim Verlassen eines Feldes automatisch gespeichert, es gibt keinen Speichern-Button.
 
+**Energieeffizienzklasse:** in den Stammdaten als Auswahl A+ bis H laut Energieausweis.
+Sie ist eine reine Angabe, erscheint als Kennzeichen in der Objektliste und rechnet nirgends mit.
+
 **Kaufnebenkosten:** jede Position über die Schalter `%` / `€` umstellbar. Beim Wechsel wird
 der Wert umgerechnet, der Euro-Betrag bleibt gleich. Über „+ Weitere Position" lassen sich
 eigene Posten ergänzen.

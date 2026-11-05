@@ -17,6 +17,13 @@ export const OBJEKTTYPEN = [
   { wert: 'Grundstueck', text: 'Grundstück' },
 ];
 
+/* Energieeffizienzklassen des Energieausweises für Wohngebäude (GEG, Anlage 10).
+   Nur Angabe, rechnet nirgends mit. Leer = nicht angegeben. */
+export const ENERGIEKLASSEN = [
+  { wert: '', text: '– nicht angegeben –' },
+  ...['A+', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'].map((k) => ({ wert: k, text: k })),
+];
+
 export const typText = (t) => OBJEKTTYPEN.find((o) => o.wert === t)?.text || t || '–';
 
 /** Stift für die Aktionsspalte der Tabellenansicht. */
@@ -193,6 +200,7 @@ function kachel(o) {
         el('span.badge', { text: typText(o.typ) }),
         anzEinheiten ? el('span.badge', { text: anzEinheiten + ' Einheiten' }) : null,
         o.baujahr ? el('span.badge', { text: 'Bj. ' + o.baujahr }) : null,
+        o.energieklasse ? el('span.badge', { text: 'Energie ' + o.energieklasse }) : null,
       ]),
       el('div.obj-zahlen', {}, [
         wertPaar('Verkehrswert', z.verkehrswert ? eur(z.verkehrswert, 0) : '–'),

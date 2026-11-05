@@ -14,7 +14,7 @@ import {
   anzeigeFeld, felderGitter, abschnitt, parseZahl,
   tabellenDatum, tabellenZahl, tabellenText, tabellenAuswahl,
 } from '../felder.js';
-import { OBJEKTTYPEN, typText } from './objekte.js';
+import { OBJEKTTYPEN, ENERGIEKLASSEN, typText } from './objekte.js';
 import { anlegen as mietvertragAnlegen, STATUS_TEXT, STATUS_KLASSE } from './mietvertraege.js';
 import {
   anlegen as darlehenAnlegen, artText, finanzierungKennzahlen, balken,
@@ -381,6 +381,7 @@ function stammdaten(o, inner, allesNeu) {
       textFeld('Ort', o, 'ort', { nach: kopfNeu }),
       auswahlFeld('Bundesland', o, 'bundesland', laender, { hint: 'bestimmt die Grunderwerbsteuer', nach: kopfNeu }),
       zahlFeld('Baujahr', o, 'baujahr', { nachkomma: 0, jahr: true, nach: kopfNeu }),
+      auswahlFeld('Energieeffizienzklasse', o, 'energieklasse', ENERGIEKLASSEN, { hint: 'laut Energieausweis', nach: kopfNeu }),
       zahlFeld('Kappungsgrenze, abweichend', o, 'kappungsgrenzeAbweichend', {
         suffix: '%', nachkomma: 0, nach: kopfNeu,
         hint: `leer = Portfolio-Vorgabe (${num(state.daten.einstellungen.kappungsgrenzeProzent ?? 20, 0)} %) · 15 % gelten nur in Gebieten mit angespanntem Wohnungsmarkt`,

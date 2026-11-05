@@ -407,6 +407,7 @@ export function neuesObjekt(einstellungen = STANDARD_EINSTELLUNGEN) {
     strasse: '', plz: '', ort: '',
     typ: 'ETW',                    // ETW | MFH | EFH | Gewerbe | Grundstueck
     baujahr: null,
+    energieklasse: '',             // A+ … H laut Energieausweis, '' = nicht angegeben
     mehrereEinheiten: false,
     flaeche: null, zimmer: null,   // bei Einzelobjekten
     kaufdatum: heuteISO(),
