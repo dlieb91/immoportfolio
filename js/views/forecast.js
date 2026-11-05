@@ -459,7 +459,7 @@ function tabelle(p) {
       ? el('div', { style: 'padding:12px 18px;border-top:1px solid var(--border);display:grid;gap:6px' }, [
           mitEk ? el('div.hint', { html:
             `<strong>EK-Rendite</strong> = Cashflow des Jahres ÷ eingesetztes Eigenkapital `
-            + `(${eur(p.jahre[0].eigenkapitalEingesetzt, 0)}, also Gesamtinvestition abzüglich Darlehen). `
+            + `(${eur(p.jahre[0].eigenkapitalEingesetzt, 0)}, also Gesamtinvestition plus Sanierung abzüglich Darlehen). `
             + '<strong>inkl. Aufbau</strong> zählt Tilgung und Tilgungsersatz mit, die als Vermögen erhalten bleiben. '
             + 'Wertsteigerung steckt in beiden nicht.' }) : null,
           ersatz ? el('div.hint', { html:

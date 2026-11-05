@@ -18,13 +18,13 @@
 
 import { heuteISO } from './util.js';
 import {
-  state, einheitenVon, finanzierungenVon, verkehrswert, nebenkostenBerechnen,
+  state, einheitenVon, finanzierungenVon, verkehrswert,
   aktiveVertraege, aktuelleKondition, besitzMonate,
 } from './store.js';
 import {
   tilgungsplan, restschuldZu, ersatzGuthabenZu, ersatzEingezahltBis,
 } from './finanzmathematik.js';
-import { afaImJahr, afaWerte } from './kennzahlen.js';
+import { afaImJahr, afaWerte, eingesetztesKapital } from './kennzahlen.js';
 
 export const SZENARIEN = [
   { id: 'pessimistisch', name: 'Pessimistisch' },
@@ -145,12 +145,10 @@ export function prognose(params, stichtag = heuteISO(), objektIds = null) {
     ? startJahr + Number(params.verkaufNachJahren)
     : null;
 
-  /* Eingesetztes Eigenkapital: Gesamtinvestition abzüglich Darlehen.
-     Über die Jahre konstant und Nenner der Eigenkapitalrendite. */
-  const eigenkapitalEingesetzt = objekte.reduce((summe, o) => {
-    const darlehen = finanzierungenVon(o.id).reduce((d, f) => d + (f.betrag || 0), 0);
-    return summe + Math.max(0, nebenkostenBerechnen(o).gesamt - darlehen);
-  }, 0);
+  /* Eingesetztes Eigenkapital: Gesamtinvestition plus Sanierung abzüglich
+     Darlehen, siehe eingesetztesKapital(). Über die Jahre konstant und Nenner
+     der Eigenkapitalrendite. */
+  const eigenkapitalEingesetzt = objekte.reduce((summe, o) => summe + eingesetztesKapital(o).eingesetzt, 0);
 
   const jahre = [];
   let kumuliertVor = 0;

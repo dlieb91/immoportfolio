@@ -194,6 +194,30 @@ export function erhaltungSteuerlich(objektId, jahr) {
   return summe;
 }
 
+/**
+ * Eingesetztes Eigenkapital eines Objekts:
+ *
+ *   Kaufpreis + Nebenkosten (abzüglich Eigenprovision) + Sanierung − Darlehen
+ *
+ * Sanierung heißt: alle Maßnahmen der Karte „Modernisierung & Sanierung“,
+ * gleich wie sie steuerlich behandelt werden (sofort abgesetzt oder über die
+ * AfA). Das Geld dafür ist eingesetzt, egal was das Finanzamt daraus macht.
+ *
+ * Erhaltungs-Buchungen zählen hier **nicht**: Sie sind Zahlungen und mindern
+ * bereits den geflossenen Cashflow – hier mitgezählt, stünden sie doppelt da.
+ * Die Maßnahmen der Sanierungskarte haben dagegen keine Zahlung in der
+ * Buchhaltung und tauchten bisher nirgends als eingesetztes Geld auf.
+ *
+ * Eine Stelle für alle: Übersicht, Kapitalbindung und Forecast rechneten
+ * dieselbe Zahl bisher je für sich.
+ */
+export function eingesetztesKapital(o) {
+  const investition = nebenkostenBerechnen(o).gesamt;
+  const sanierung = (o.modernisierung || []).reduce((s, m) => s + (m.betrag || 0), 0);
+  const darlehen = finanzierungenVon(o.id).reduce((s, f) => s + (f.betrag || 0), 0);
+  return { investition, sanierung, darlehen, eingesetzt: Math.max(0, investition + sanierung - darlehen) };
+}
+
 export function afaWerte(o) {
   const g = gebaeudeAnschaffung(o);
   /* Modernisierungen und Erhaltungsbuchungen werden nicht gespiegelt oder
@@ -382,7 +406,8 @@ export function objektKennzahlen(o, stichtag = heuteISO()) {
 
   /* Kapital */
   const getilgt = Math.max(0, darlehenssumme - restschuld);
-  const eigenkapitalEingesetzt = Math.max(0, nk.gesamt - darlehenssumme);
+  const kapital = eingesetztesKapital(o);
+  const eigenkapitalEingesetzt = kapital.eingesetzt;
   const eigenkapital = wert - restschuld;
 
   return {
@@ -397,6 +422,7 @@ export function objektKennzahlen(o, stichtag = heuteISO()) {
     // Basis
     kaufpreis: o.kaufpreis || 0,
     investition: nk.gesamt,
+    sanierung: kapital.sanierung,
     nebenkosten: nk.summe,
     eigenprovision: nk.eigenprovision,
     verkehrswert: wert,
@@ -549,8 +575,7 @@ export function kapitalbindung(o, stichtag = heuteISO()) {
   }
 
   // Über die Jahre konstant, deshalb ohne Stichtag gerechnet
-  const darlehen = finanzierungenVon(o.id).reduce((s, f) => s + (f.betrag || 0), 0);
-  const eingesetzt = Math.max(0, nebenkostenBerechnen(o).gesamt - darlehen);
+  const eingesetzt = eingesetztesKapital(o).eingesetzt;
 
   return {
     monate,
@@ -596,6 +621,7 @@ export function portfolioKennzahlen(stichtag = heuteISO()) {
     anzahl: objekte.length,
     investition,
     kaufpreis: summe('kaufpreis'),
+    sanierung: summe('sanierung'),
     eigenprovision: summe('eigenprovision'),
     verkehrswert: verkehrswertGesamt,
     flaeche: summe('flaeche'),

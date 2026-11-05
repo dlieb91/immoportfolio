@@ -136,7 +136,9 @@ function kennzahlen(o, z, p) {
 
   return el('div.grid.grid-kpi', {}, [
     kachel('Eingesetztes Eigenkapital', eur(z.eigenkapitalEingesetzt, 0),
-      z.darlehenssumme ? `${eur(z.darlehenssumme, 0)} fremdfinanziert` : 'ohne Darlehen'),
+      [z.sanierung ? `inkl. ${eur(z.sanierung, 0)} Sanierung` : null,
+        z.darlehenssumme ? `${eur(z.darlehenssumme, 0)} fremdfinanziert` : 'ohne Darlehen']
+        .filter(Boolean).join(' · ')),
     kachel(`Ø Cashflow / Monat`, eur(schnitt / 12, 0),
       `${volle.length} volle Jahre, ${nach ? 'nach' : 'vor'} Steuern`, schnitt >= 0 ? 'pos' : 'neg'),
     kachel('Kumulierter Cashflow', eur(letzt[kumFeld], 0),

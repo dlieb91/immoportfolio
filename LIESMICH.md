@@ -293,6 +293,7 @@ werden bewusst nicht verglichen; die laufen auf zwei Geräten ohnehin auseinande
 | 23 | Schreiben an den Mieter: Verlangen (§ 558), Indexerklärung (§ 557b), Ankündigung der Staffel | fertig |
 | 24 | iPad im Vollbild: Kopfzeile nicht mehr unter der Statusleiste | fertig |
 | 25 | Handy: Leiste unten, einklappbare Karten, Buchhaltung mit Fenster von unten | fertig |
+| 26 | Eingesetztes Eigenkapital einschließlich Sanierung | fertig |
 
 ## Aufbau des Codes
 
@@ -343,6 +344,20 @@ eigene Posten ergänzen.
 zurückfließende Provision. Sie mindert die Gesamtinvestition und damit die AfA-Bemessungsgrundlage
 und das eingesetzte Eigenkapital – die Kaufnebenkosten bleiben unangetastet, denn
 Grunderwerbsteuer, Notar und Makler wurden auf den beurkundeten Kaufpreis festgesetzt.
+
+**Eingesetztes Eigenkapital** – auf Objekt- und Portfolioebene, im Forecast und in der
+Kapitalbindung dieselbe Zahl:
+
+> Kaufpreis + Nebenkosten (abzüglich Eigenprovision) **+ Sanierung** − Darlehen
+
+*Sanierung* sind alle Maßnahmen der Karte *Modernisierung & Sanierung*, gleich ob sie
+steuerlich sofort abgesetzt oder über die AfA abgeschrieben werden – das Geld ist eingesetzt,
+egal was das Finanzamt daraus macht. **Erhaltungs-Buchungen zählen nicht mit:** Sie sind
+Zahlungen in der Buchhaltung und mindern bereits den geflossenen Cashflow; hier noch einmal
+gezählt, stünden sie doppelt da. Wer eine größere Sanierung aus eigener Tasche bezahlt, trägt
+sie deshalb in der Sanierungskarte ein. Die Gesamtinvestition bleibt Kaufpreis plus
+Nebenkosten, damit Kaufpreisfaktor und Mietrenditen weiter auf den Kauf bezogen sind; die
+Eigenkapitalrenditen rechnen auf das eingesetzte Eigenkapital einschließlich Sanierung.
 
 **Bilder:** ins gestrichelte Feld ziehen oder hineinklicken. Der Stern setzt das Titelbild,
 ein Klick aufs Bild zeigt es groß.

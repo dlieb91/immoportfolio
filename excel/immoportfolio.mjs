@@ -573,6 +573,7 @@ function namenBauen() {
     ObjSonstige: bereich('Objekte', O.sonstige, OBJ_ERSTE, OBJ_LETZTE),
     ObjWert: bereich('Objekte', O.wert, OBJ_ERSTE, OBJ_LETZTE),
     ObjInvest: bereich('Objekte', O.hInvest, OBJ_ERSTE, OBJ_LETZTE),
+    ObjModern: bereich('Objekte', O.modern, OBJ_ERSTE, OBJ_LETZTE),
     ObjGrund: bereich('Objekte', O.hGrund, OBJ_ERSTE, OBJ_LETZTE),
     ObjGebaeude: bereich('Objekte', O.hGebaeude, OBJ_ERSTE, OBJ_LETZTE),
     ObjNkSumme: bereich('Objekte', O.hNk, OBJ_ERSTE, OBJ_LETZTE),
@@ -1652,7 +1653,8 @@ function blattKern(jahr) {
       [I.steuerRunrate]: f(`${c(I.einkRunrate)}*${c(I.steuersatz)}/100`),
       [I.cfRunrateNach]: f(`${c(I.cfRunrate)}-${c(I.steuerRunrate)}`),
 
-      [I.ekEingesetzt]: f(`MAX(0,${c(I.invest)}-${c(I.darlehen)})`),
+      // wie eingesetztesKapital() in der App: Gesamtinvestition + Sanierung − Darlehen
+      [I.ekEingesetzt]: f(`MAX(0,${c(I.invest)}+${idx('ObjModern')}-${c(I.darlehen)})`),
       [I.ek]: f(`${c(I.wert)}-${c(I.rest)}`),
       [I.getilgt]: f(`MAX(0,${c(I.darlehen)}-${c(I.rest)})`),
       [I.ersatzEin]: f(bisStichtag('TilgErsatz')),
@@ -2433,6 +2435,7 @@ function blattUebersicht(jahr) {
   punkt('Tilgung', 'Nachschüssige Annuität, monatlich verrechnet. Die erste Rate fällt im Monat nach der Auszahlung an. Nach Ablauf der Zinsbindung läuft die bisherige Rate weiter, solange sie mindestens 1 % der Restschuld tilgt.');
   punkt('Renditen', 'Rechnen immer mit zwölf mal der aktuellen Monatsmiete, damit ein angeschnittenes Anschaffungsjahr sie nicht verzerrt.');
   punkt('Nebenkosten', 'Umlagefähige Kosten und Nebenkosten-Vorauszahlungen sind ein durchlaufender Posten und bleiben im Cashflow außen vor.');
+  punkt('Eingesetztes Eigenkapital', 'Gesamtinvestition plus Modernisierung (Spalte „Modernis. €“) abzüglich Darlehen – wie in der App, wo alle Maßnahmen der Sanierungskarte mitzählen. Erhaltungsaufwand aus der Buchhaltung zählt nicht, er mindert bereits den Cashflow.');
   punkt('Eigenprovision', 'Eine nachträgliche Kaufpreisreduktion mindert die Gesamtinvestition und damit AfA-Bemessungsgrundlage und eingesetztes Eigenkapital – die Kaufnebenkosten bleiben unangetastet, denn Grunderwerbsteuer, Notar und Makler wurden auf den beurkundeten Kaufpreis festgesetzt.');
 
   h2('Grenzen dieser Mappe');

@@ -161,7 +161,9 @@ function kennzahlen(o) {
     k('Bruttomietrendite', z.bruttorenditeKaufpreis ? num(z.bruttorenditeKaufpreis, 2) + ' %' : '–',
       z.bruttorendite ? `auf Kaufpreis · ${num(z.bruttorendite, 2)} % inkl. Nebenkosten` : 'Jahreskaltmiete / Kaufpreis'),
     k('Eingesetztes Eigenkapital', eur(z.eigenkapitalEingesetzt, 0),
-      z.darlehenssumme ? `${eur(z.darlehenssumme, 0)} fremdfinanziert` : 'vollständig aus Eigenmitteln'),
+      [z.sanierung ? `inkl. ${eur(z.sanierung, 0)} Sanierung` : null,
+        z.darlehenssumme ? `${eur(z.darlehenssumme, 0)} fremdfinanziert` : 'vollständig aus Eigenmitteln']
+        .filter(Boolean).join(' · ')),
     k('Getilgt', eur(z.getilgt, 0),
       z.darlehenssumme ? `${num(z.getilgtProzent, 1)} % · Restschuld ${eur(z.restschuld, 0)}` : 'kein Darlehen'),
     ...(z.mitErsatz ? [
@@ -317,6 +319,7 @@ function kapitalKarte(o) {
         el('table.data.kompakt', {}, [el('tbody', {}, [
           zeile('Gesamtinvestition', z.investition, null,
             'Kaufpreis inkl. Nebenkosten' + (z.eigenprovision ? ', abzgl. Eigenprovision' : '')),
+          z.sanierung ? zeile('Sanierung', z.sanierung, null, 'Maßnahmen aus „Modernisierung & Sanierung“') : null,
           zeile('Darlehen', z.darlehenssumme, 'abzug'),
           zeile('Eingesetztes Eigenkapital', z.eigenkapitalEingesetzt, 'summe'),
           el('tr', {}, [el('td', { colspan: 2, style: 'height:8px;border:none' })]),

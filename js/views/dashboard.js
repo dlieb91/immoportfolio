@@ -66,7 +66,9 @@ function kennzahlen(p, folge, nach, kb) {
     kachel('Restschuld', eur(p.restschuld, 0),
       p.verkehrswert ? `Beleihungsauslauf ${num(p.ltv, 1)} %` : null),
     kachel('Eingesetztes Eigenkapital', eur(p.eigenkapitalEingesetzt, 0),
-      p.darlehenssumme ? `${eur(p.darlehenssumme, 0)} fremdfinanziert` : 'ohne Darlehen'),
+      [p.sanierung ? `inkl. ${eur(p.sanierung, 0)} Sanierung` : null,
+        p.darlehenssumme ? `${eur(p.darlehenssumme, 0)} fremdfinanziert` : 'ohne Darlehen']
+        .filter(Boolean).join(' · ')),
     kachel('Summe der Tilgungen', eur(p.getilgt, 0),
       p.darlehenssumme ? `${num(p.getilgt / p.darlehenssumme * 100, 1)} % der Darlehen` : 'kein Darlehen'),
     (() => {
@@ -208,6 +210,7 @@ function vermoegen(p) {
         el('tbody', {}, [
           zeile('Kaufpreise', eur(p.kaufpreis, 0)),
           zeile('Gesamtinvestition inkl. Nebenkosten', eur(p.investition, 0)),
+          p.sanierung ? zeile('Sanierung', eur(p.sanierung, 0)) : null,
           zeile('Verkehrswert heute', eur(p.verkehrswert, 0)),
           zeile('Eingesetztes Eigenkapital', eur(p.eigenkapitalEingesetzt, 0)),
           zeile('Netto-Vermögen', eur(p.eigenkapital, 0), true),
