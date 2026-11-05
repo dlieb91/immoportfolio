@@ -33,10 +33,16 @@ self.addEventListener('install', (e) => {
   );
 });
 
+/* Auf GitHub Pages teilen sich mehrere Zahlenkompass-Apps eine Herkunft
+   (dlieb91.github.io) und damit einen Topf an Zwischenspeichern. Geraeumt
+   werden deshalb nur die eigenen – sonst loeschte jede neue Fassung von
+   ImmoPortfolio nebenbei die Offline-Huelle von StundenKompass. */
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys()
-      .then((namen) => Promise.all(namen.filter((n) => n !== CACHE).map((n) => caches.delete(n))))
+      .then((namen) => Promise.all(namen
+        .filter((n) => n.startsWith('immo-') && n !== CACHE)
+        .map((n) => caches.delete(n))))
       .then(() => self.clients.claim())
   );
 });
