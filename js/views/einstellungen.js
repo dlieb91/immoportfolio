@@ -43,13 +43,18 @@ async function programmErneuern() {
   if (!ja) return;
   await sofortSpeichern();
   try {
+    /* Nur die eigenen: Auf GitHub Pages teilen sich mehrere Zahlenkompass-Apps
+       die Herkunft dlieb91.github.io und damit Zwischenspeicher und Service
+       Worker. Alles zu räumen nähme StundenKompass die Offline-Hülle – wie
+       sw.js räumt dieser Knopf nur, was mit „immo-“ beginnt, und meldet nur
+       den Service Worker ab, der diese Seite steuert. */
     if ('caches' in window) {
       const namen = await caches.keys();
-      await Promise.all(namen.map((n) => caches.delete(n)));
+      await Promise.all(namen.filter((n) => n.startsWith('immo-')).map((n) => caches.delete(n)));
     }
     if ('serviceWorker' in navigator) {
-      const regs = await navigator.serviceWorker.getRegistrations();
-      await Promise.all(regs.map((r) => r.unregister()));
+      const reg = await navigator.serviceWorker.getRegistration();
+      if (reg) await reg.unregister();
     }
   } catch (e) {
     console.warn('Zwischenspeicher liess sich nicht raeumen:', e.message);
