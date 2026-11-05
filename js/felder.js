@@ -5,7 +5,7 @@
    Feldes (change), damit die Eingabe nicht unterbrochen wird.
 */
 
-import { el, num } from './util.js';
+import { el, num, istHandy } from './util.js';
 import { aendern, protokollieren } from './store.js';
 
 /**
@@ -356,5 +356,99 @@ export function kartenListe(wurzel = document) {
         if (kopf[i]) zelle.dataset.spalte = kopf[i];
       });
     }
+  }
+}
+
+/* ---------- Einklappbare Karten (Handy) ----------
+
+   Am Handy ist eine Objektansicht sonst zehn Bildschirme lang. Jede Karte mit
+   Überschrift lässt sich dort per Tipp auf den Kopf ein- und ausklappen; der
+   Zustand wird je Ansicht und Kartentitel im Gerät gemerkt. Am Rechner und
+   auf dem iPad wirkt nichts davon – die Klasse `zu` greift nur in der
+   Handy-Media-Query von app.css, und der Klick prüft istHandy().
+
+   Was standardmäßig zu ist: Eingabe- und Detailkarten, die man selten
+   braucht. Offen bleibt, was man beim Öffnen einer Ansicht sehen will –
+   Kennzahlen, Cashflow, Hinweise, Ergebnisse. */
+
+const STANDARD_ZU = [
+  /^Annahmen$/, /^Anhang: Herleitung/, /^Änderungsprotokoll/, /^Dokumente$/, /^Bilder$/, /^Notizen$/,
+  /^Stammdaten$/, /^Steuerliche Angaben$/, /^Einheiten$/, /^Laufende Kosten$/, /^Modernisierung/,
+  /^Buchungen/, /^Nebenkostenabrechnung/, /^Tilgungsplan$/, /^Konditionen$/, /^Sondertilgungen$/,
+  /^Jahr für Jahr$/, /^Mietkonditionen/, /^Laufzeit/, /^Zuordnung/, /^Vertragsdaten/,
+];
+const KLAPP_KEY = 'immo-karten-zu';
+
+function klappZustand() {
+  try { return JSON.parse(localStorage.getItem(KLAPP_KEY) || '{}'); } catch { return {}; }
+}
+
+export function kartenKlappen(wurzel) {
+  if (!wurzel) return;
+  const route = (location.hash.replace(/^#\//, '') || 'dashboard').split('?')[0];
+  const gemerkt = klappZustand();
+  for (const karte of wurzel.querySelectorAll('.card')) {
+    if (karte.dataset.klappbar) continue;
+    const kopf = karte.querySelector(':scope > .card-head');
+    const h2 = kopf?.querySelector('h2');
+    if (!h2) continue;
+    const titel = h2.textContent.trim();
+    // Jahreszahlen im Titel („Buchungen 2026“) sollen den Zustand nicht jedes Jahr zurücksetzen.
+    const schluessel = route + '|' + titel.replace(/\d{4}/g, '#');
+    karte.dataset.klappbar = '1';
+    karte.classList.toggle('zu', gemerkt[schluessel] ?? STANDARD_ZU.some((re) => re.test(titel)));
+    kopf.addEventListener('click', (e) => {
+      if (!istHandy()) return;
+      // Knöpfe und Felder im Kopf behalten ihre eigene Aufgabe.
+      if (e.target.closest('button, a, input, select, textarea, label, .seg')) return;
+      const zu = karte.classList.toggle('zu');
+      // Eingeklappt hatten Tabellen keine Breite – erst jetzt lässt sich messen.
+      if (!zu) { breiteTabellen(karte); langeHinweise(karte); }
+      const z = klappZustand();
+      z[schluessel] = zu;
+      localStorage.setItem(KLAPP_KEY, JSON.stringify(z));
+    });
+  }
+}
+
+/* ---------- Breite Tabellen ----------
+   Eine Tabelle, die breiter ist als ihr Platz, bekommt einen eigenen
+   Scrollbehälter. Nur diese: Allen anderen nähme ein Behälter die volle
+   Breite. Tabellen in .plan-scroll haben ihren schon, Listentabellen werden
+   zu Karten. */
+export function breiteTabellen(wurzel) {
+  if (!wurzel) return;
+  for (const t of wurzel.querySelectorAll('table.data:not(.liste)')) {
+    if (t.closest('.plan-scroll, .tabelle-scroll')) continue;
+    const platz = t.parentElement?.clientWidth || 0;
+    if (!platz || t.scrollWidth <= platz + 1) continue;
+    const huelle = el('div.tabelle-scroll');
+    t.before(huelle);
+    huelle.append(t);
+  }
+}
+
+/* ---------- Lange Hinweise (Handy) ----------
+   Am Handy füllte ein Hinweis von zwölf Zeilen den ersten Bildschirm. Er
+   wird auf drei Zeilen gekürzt, „mehr“ zeigt den Rest. Der Anfang bleibt
+   stehen – dort steht, was niemand übersehen darf („keine Steuerberatung“). */
+const HINWEIS_LANG = 240;
+
+export function langeHinweise(wurzel) {
+  if (!wurzel || !istHandy()) return;
+  for (const note of wurzel.querySelectorAll('.note')) {
+    if (note.dataset.gekuerzt) continue;
+    const text = note.lastElementChild;
+    if (!text || (text.textContent || '').length < HINWEIS_LANG) continue;
+    note.dataset.gekuerzt = '1';
+    note.classList.add('gekuerzt');
+    const knopf = el('button.note-mehr', {
+      type: 'button', text: 'mehr',
+      onclick: () => {
+        const offen = note.classList.toggle('offen');
+        knopf.textContent = offen ? 'weniger' : 'mehr';
+      },
+    });
+    note.append(knopf);
   }
 }

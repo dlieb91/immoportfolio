@@ -135,6 +135,32 @@ getippt wird – mit dem Finger gibt es kein Darüberfahren, und beim Abheben
 verschwände der Wert, bevor man ihn gelesen hat. Senkrecht scrollt die Seite
 weiter, waagerechtes Wischen gehört dem Diagramm.
 
+## Auf dem Handy benutzen
+
+Dieselbe Adresse, derselbe Weg über *Teilen → Zum Home-Bildschirm*. Unter 600 px Breite stellt
+die App auf Daumenbedienung um; darüber – iPad, Rechner – bleibt alles, wie es ist.
+
+- **Leiste unten** mit Start, Objekte, Buchhaltung und Forecast; **Mehr** öffnet das Menü mit
+  allen übrigen Ansichten und dem Umschalter für Hell und Dunkel.
+- **Kopfzeile:** Der Titel steht immer lesbar da. Der Steuerumschalter heißt kurz *vor / nach*,
+  der Speicherstatus ist nur noch der Punkt daneben (grün = gespeichert).
+- **Einklappbare Karten:** Ein Tipp auf den Kartenkopf klappt ein und aus, die App merkt sich
+  das je Ansicht. Eingabe- und Detailkarten (Stammdaten, Laufende Kosten, Tilgungsplan, Anhang
+  der Anlage V, Annahmen im Forecast …) sind anfangs zu, Kennzahlen und Ergebnisse offen.
+  Gedruckt wird immer alles.
+- **Buchhaltung:** Die Filter liegen hinter dem Knopf *Filter*; er nennt, wie viele gesetzt
+  sind. Die Buchungen sind nach Monaten gruppiert, offen ist zunächst der laufende. Eine Zeile
+  zeigt Text und Betrag – **antippen** öffnet ein Fenster von unten mit Betrag, Zahlungseingang
+  (nicht verfolgt / offen / eingegangen), Notiz, *Ausgefallen* und *Löschen*. Eine neue Buchung
+  oder Fahrt öffnet ihr Fenster gleich mit.
+- **Lange Hinweise** sind auf drei Zeilen gekürzt, *mehr* zeigt den Rest. Der Anfang bleibt
+  stehen – dort steht, was man nicht übersehen soll.
+- Breite Tabellen scrollen in sich, statt die Seite zu verbreitern; alle Knöpfe und Felder
+  sind mindestens 44 px hoch.
+
+Wer das Gerät dreht oder das Fenster zieht, bekommt beim Überschreiten der Grenze sofort die
+passende Darstellung.
+
 ## Drucken
 
 Objektblatt, Anlage-V-Aufstellung und Forecast tragen oben rechts einen Knopf **Drucken**.
@@ -266,6 +292,7 @@ werden bewusst nicht verglichen; die laufen auf zwei Geräten ohnehin auseinande
 | 22 | Liquiditätsvorschau über zwölf Monate | fertig |
 | 23 | Schreiben an den Mieter: Verlangen (§ 558), Indexerklärung (§ 557b), Ankündigung der Staffel | fertig |
 | 24 | iPad im Vollbild: Kopfzeile nicht mehr unter der Statusleiste | fertig |
+| 25 | Handy: Leiste unten, einklappbare Karten, Buchhaltung mit Fenster von unten | fertig |
 
 ## Aufbau des Codes
 

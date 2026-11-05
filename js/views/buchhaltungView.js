@@ -4,7 +4,7 @@
    'manuell' ist direkt editierbar und löschbar.
 */
 
-import { el, leeren, eur, num, toast, bestaetigen, csvZeile } from '../util.js';
+import { el, leeren, eur, num, toast, bestaetigen, csvZeile, istHandy, modal, datum } from '../util.js';
 import { state, aendern, protokollieren, einheitenVon, einheitName, neueBuchung, neueFahrt } from '../store.js';
 import {
   GRUPPEN, KATEGORIEN, artInfo, buchungsliste, fahrtBetrag,
@@ -29,6 +29,11 @@ const filter = {
 };
 let sichtbar = SCHRITT;
 
+/* Nur am Handy: Filter aufgeklappt? Welche Monate sind offen? Sicht, nicht
+   Daten – beides lebt nur in dieser Sitzung. */
+let filterOffen = false;
+let offeneMonate = null;   // null = noch nie gesetzt, dann der laufende Monat
+
 export const buchhaltung = {
   render(container) {
     const inner = el('div.view-inner', { style: 'display:grid;gap:16px' });
@@ -48,6 +53,15 @@ export const buchhaltung = {
 
     const neu = () => { leeren(container); this.render(container); };
     const liste = buchungsliste(abfrage());
+
+    /* Am Handy eine eigene Darstellung: 113 Zeilen voller Eingabefelder
+       waren dort 52 Bildschirme lang und kaum zu treffen. */
+    if (istHandy()) {
+      inner.append(...handyKopf(neu, liste.length));
+      inner.append(summen(liste));
+      inner.append(handyListe(liste, neu));
+      return;
+    }
 
     inner.append(filterKarte(neu, liste.length));
     inner.append(summen(liste));
@@ -164,8 +178,6 @@ function filterKarte(neu, treffer) {
   const anzahlKorr = (state.daten.zahlungen || []).length;
   const anzahlManuell = (state.daten.buchungen || []).length + (state.daten.fahrten || []).length;
 
-  const objektFuerNeu = () => filter.objektId || state.daten.objekte[0]?.id;
-
   return el('div.card', {}, [
     el('div.card-body', { style: 'display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap' }, [
       feld('Jahr', jahrSel),
@@ -187,32 +199,233 @@ function filterKarte(neu, treffer) {
           style: 'font-size:11.5px',
         }),
       ]),
-      el('button.btn.btn-sm.btn-primary', {
-        type: 'button',
-        onclick: () => {
-          const oid = objektFuerNeu();
-          if (!oid) return;
-          aendern((d) => { d.buchungen.push(neueBuchung(oid)); });
-          sichtbar += 1;
-          neu();
-        },
-      }, ['+ Buchung']),
-      el('button.btn.btn-sm', {
-        type: 'button',
-        onclick: () => {
-          const oid = objektFuerNeu();
-          if (!oid) return;
-          aendern((d) => { d.fahrten.push(neueFahrt(oid)); });
-          sichtbar += 1;
-          neu();
-        },
-      }, ['+ Fahrt']),
+      el('button.btn.btn-sm.btn-primary', { type: 'button', onclick: () => anlegen('buchung', neu) }, ['+ Buchung']),
+      el('button.btn.btn-sm', { type: 'button', onclick: () => anlegen('fahrt', neu) }, ['+ Fahrt']),
       anzahlKorr
         ? el('button.btn.btn-sm.btn-danger', { type: 'button', onclick: () => alleVerwerfen(neu) }, ['Korrekturen verwerfen'])
         : null,
       el('button.btn.btn-sm', { type: 'button', onclick: () => exportieren(buchungsliste(abfrage())) }, ['CSV']),
     ]),
   ]);
+}
+
+/** Legt eine Buchung oder Fahrt an. Am Handy öffnet sich gleich ihr Fenster. */
+function anlegen(art, neu) {
+  const oid = filter.objektId || state.daten.objekte[0]?.id;
+  if (!oid) return;
+  const eintrag = art === 'fahrt' ? neueFahrt(oid) : neueBuchung(oid);
+  aendern((d) => { (art === 'fahrt' ? d.fahrten : d.buchungen).push(eintrag); });
+  sichtbar += 1;
+  neu();
+  if (istHandy()) {
+    const z = buchungsliste(abfrage()).find((x) => x.herkunft === 'manuell' && x.quelle?.id === eintrag.id);
+    if (z) {
+      // Der Monat der neuen Buchung soll danach offen sein.
+      if (offeneMonate) offeneMonate.add(z.periode);
+      zeileBearbeiten(z, neu);
+    }
+  }
+}
+
+/* ---------- Handy: Kopf, Liste, Fenster ---------- */
+
+/** Wie viele Filter weichen von der Vorgabe ab? */
+function aktiveFilter() {
+  return [
+    filter.jahr !== new Date().getFullYear(), filter.objektId, filter.einheitId, filter.art,
+    filter.herkunft, filter.nurKorrigiert, filter.nurOffen, filter.mitGeplanten,
+  ].filter(Boolean).length;
+}
+
+function handyKopf(neu, treffer) {
+  const n = aktiveFilter();
+  const kopf = el('div.card', {}, [
+    el('div.card-body', { style: 'display:flex;gap:8px;flex-wrap:wrap;align-items:center' }, [
+      el('button.btn' + (filterOffen ? '.btn-primary' : ''), {
+        type: 'button', 'aria-expanded': String(filterOffen),
+        onclick: () => { filterOffen = !filterOffen; neu(); },
+      }, [n ? `Filter (${n} aktiv)` : 'Filter']),
+      el('button.btn.btn-primary', { type: 'button', onclick: () => anlegen('buchung', neu) }, ['+ Buchung']),
+      el('button.btn', { type: 'button', onclick: () => anlegen('fahrt', neu) }, ['+ Fahrt']),
+      el('div.faint', {
+        style: 'font-size:12px;flex-basis:100%',
+        text: `${num(treffer, 0)} Zeilen · ${filter.jahr ?? 'alle Jahre'}`
+          + (filter.mitGeplanten ? '' : ' · bis ' + monatName(laufenderMonat())),
+      }),
+    ]),
+  ]);
+  if (!filterOffen) return [kopf];
+  return [
+    kopf,
+    filterKarte(neu, treffer),
+    hinweis('Abgeleitete Zeilen (Miete, Zins, Tilgung …) stammen aus den Stammdaten und lassen sich korrigieren; '
+      + 'frei erfasste Buchungen und Fahrten sind direkt bearbeitbar. Antippen öffnet eine Zeile.'),
+  ];
+}
+
+const MONAT_LANG = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+const monatLang = (p) => `${MONAT_LANG[Number(p.slice(5, 7)) - 1]} ${p.slice(0, 4)}`;
+const wirkungVon = (z) => (z.entfaellt ? 0 : (z.ist ?? z.betrag)) * artInfo(z.art).vorzeichen;
+
+/** Die Liste: nach Monaten gruppiert, nur der laufende ist anfangs offen. */
+function handyListe(liste, neu) {
+  if (!liste.length) return tabelle(liste, neu);
+
+  const gruppen = new Map();
+  for (const z of liste) {
+    if (!gruppen.has(z.periode)) gruppen.set(z.periode, []);
+    gruppen.get(z.periode).push(z);
+  }
+  const perioden = [...gruppen.keys()].sort((a, b) => b.localeCompare(a));
+  if (!offeneMonate) {
+    offeneMonate = new Set([perioden.includes(laufenderMonat()) ? laufenderMonat() : perioden[0]]);
+  }
+
+  return el('div.card.bh-liste', {}, perioden.map((p) => {
+    const zeilen = gruppen.get(p);
+    const offen = offeneMonate.has(p);
+    const saldo = zeilen.reduce((sum, z) => sum + wirkungVon(z), 0);
+    const offenePosten = zeilen.filter((z) => z.rueckstand > 0.005).length;
+    return el('div.bh-gruppe', {}, [
+      el('button.bh-monat', {
+        type: 'button', 'aria-expanded': String(offen),
+        onclick: () => { if (offen) offeneMonate.delete(p); else offeneMonate.add(p); neu(); },
+      }, [
+        el('span', {}, [
+          el('span.bh-pfeil' + (offen ? '.offen' : '')),
+          monatLang(p),
+          el('span.faint', { text: ` · ${zeilen.length}`, style: 'font-weight:400' }),
+          offenePosten ? el('span.badge.gelb', { text: `${offenePosten} offen`, style: 'margin-left:8px' }) : null,
+        ]),
+        el('span.num' + (saldo >= 0 ? '.pos' : '.neg'), { text: eur(saldo, 0) }),
+      ]),
+      ...(offen ? zeilen.map((z) => handyZeile(z, neu)) : []),
+    ]);
+  }));
+}
+
+function zeilenTitel(z) {
+  if (z.herkunft === 'manuell') return z.bezugText || (IST_FAHRT(z) ? 'Fahrt' : artInfo(z.art).text);
+  return artInfo(z.art).text + (z.bezugText ? ' · ' + z.bezugText : '');
+}
+
+function handyZeile(z, neu) {
+  const wert = wirkungVon(z);
+  const status = z.entfaellt ? el('span.badge', { text: 'entfällt' })
+    : z.rueckstand > 0.005 ? el('span.badge.gelb', { text: 'offen' })
+      : z.verfolgt ? el('span.badge.gruen', { text: '✓ da' })
+        : z.geplant ? el('span.badge', { text: 'geplant' })
+          : z.korrigiert && z.herkunft !== 'manuell' ? el('span.badge.blau', { text: 'korrigiert' })
+            : null;
+  const unter = [
+    z.herkunft === 'manuell' && z.datum ? datum(z.datum).slice(0, 6) : null,
+    z.herkunft === 'manuell' && !IST_FAHRT(z) ? artInfo(z.art).text : null,
+    z.objektName,
+  ].filter(Boolean).join(' · ');
+
+  return el('button.bh-zeile' + (z.entfaellt ? '.entfaellt' : ''), {
+    type: 'button', onclick: () => zeileBearbeiten(z, neu),
+  }, [
+    el('span.bh-links', {}, [
+      el('span.bh-titel', { text: zeilenTitel(z) }),
+      el('span.bh-unter', { text: unter }),
+    ]),
+    el('span.bh-rechts', {}, [
+      el('span.bh-betrag' + (wert > 0 ? '.pos' : ''), { text: eur(wert) }),
+      status,
+    ]),
+  ]);
+}
+
+const feldMit = (label, control, hint) => el('div.field', {}, [
+  el('label', { text: label }), control, hint ? el('div.hint', { text: hint }) : null,
+]);
+
+/**
+ * Das Fenster von unten. Änderungen wirken sofort, wie in den Feldern am
+ * Rechner; „Fertig“ schließt nur. Danach baut die Liste neu.
+ */
+async function zeileBearbeiten(z, neu) {
+  const a = artInfo(z.art);
+  const inhalt = el('div', { style: 'display:grid;gap:4px' });
+  const knoepfe = [];
+
+  if (z.herkunft === 'manuell') {
+    const q = z.quelle;
+    const opt = { nach: () => {}, umbauen: () => {} };
+    if (IST_FAHRT(z)) {
+      inhalt.append(
+        feldMit('Datum', tabellenDatum(q, 'datum', opt)),
+        feldMit('Anlass', tabellenText(q, 'anlass', { ...opt, platzhalter: 'Anlass der Fahrt' })),
+        feldMit('Kilometer', tabellenZahl(q, 'km', { ...opt, nachkomma: 0 }),
+          'der Betrag ergibt sich aus der Pauschale unter Einstellungen'),
+      );
+    } else {
+      inhalt.append(
+        feldMit('Datum', tabellenDatum(q, 'datum', opt), 'Tag der Zahlung (§ 11 EStG)'),
+        feldMit('Kategorie', tabellenAuswahl(q, 'kategorie',
+          KATEGORIEN.filter((k) => !k.abgeleitet).map((k) => ({ wert: k.key, text: k.text })), opt)),
+        feldMit('Bezeichnung', tabellenText(q, 'bezeichnung', { ...opt, platzhalter: 'Bezeichnung' })),
+        feldMit('Betrag', tabellenZahl(q, 'betrag', opt)),
+        feldMit('Notiz', tabellenText(q, 'notiz', { ...opt, platzhalter: 'Notiz' })),
+      );
+    }
+    knoepfe.push({ text: 'Löschen', wert: 'loeschen', klasse: 'btn-danger' });
+  } else {
+    const betrag = el('input', {
+      type: 'text', inputmode: 'decimal', value: z.entfaellt ? '0,00' : num(z.betrag, 2),
+      disabled: z.entfaellt,
+      onchange: (ev) => korrekturSetzen(z, { betrag: parseZahl(ev.target.value), entfaellt: false }),
+    });
+    inhalt.append(feldMit('Betrag', betrag,
+      z.entfaellt ? 'als ausgefallen markiert'
+        : `Vorgabe aus den Stammdaten: ${eur(z.standard)}` + (z.korrigiert ? ' · korrigiert' : '')));
+
+    if (EINGANG_ARTEN.has(z.art) && !z.entfaellt && !z.geplant) {
+      const stufen = [['nicht verfolgt', null], ['offen', 0], ['eingegangen', z.betrag]];
+      const aktuell = !z.verfolgt ? 0 : z.rueckstand > 0.005 ? 1 : 2;
+      const seg = el('div.seg', { style: 'width:100%' });
+      stufen.forEach(([text, wert], i) => {
+        seg.append(el('button' + (i === aktuell ? '.aktiv' : ''), {
+          type: 'button', text, style: 'flex:1',
+          onclick: () => {
+            korrekturSetzen(z, { eingegangen: wert });
+            for (const b of seg.children) b.classList.toggle('aktiv', b === seg.children[i]);
+          },
+        }));
+      });
+      inhalt.append(feldMit('Zahlungseingang', seg, 'nicht verfolgt: der Sollbetrag gilt als geflossen'));
+    }
+
+    inhalt.append(feldMit('Notiz', el('input', {
+      type: 'text', value: z.notiz, placeholder: z.korrigiert ? 'Grund der Korrektur' : '',
+      onchange: (ev) => korrekturSetzen(z, { notiz: ev.target.value }),
+    })));
+
+    knoepfe.push({ text: z.entfaellt ? 'Wieder ansetzen' : 'Ausgefallen', wert: 'entfaellt' });
+    if (z.korrigiert) knoepfe.push({ text: 'Auf Vorgabe', wert: 'zuruecksetzen' });
+  }
+  knoepfe.push({ text: 'Fertig', wert: 'fertig', klasse: 'btn-primary' });
+
+  const wahl = await modal({
+    titel: zeilenTitel(z),
+    beschreibung: [z.herkunft === 'manuell' ? (IST_FAHRT(z) ? 'Fahrt' : 'Freie Buchung') : monatText(z), a.text, z.objektName]
+      .filter((x, i, l) => x && l.indexOf(x) === i).join(' · '),
+    inhalt, buttons: knoepfe, fokus: false,
+  });
+
+  if (wahl === 'entfaellt') korrekturSetzen(z, { entfaellt: !z.entfaellt });
+  if (wahl === 'zuruecksetzen') korrekturEntfernen(z);
+  if (wahl === 'loeschen') {
+    const ok = await bestaetigen('Buchung löschen?', `„${zeilenTitel(z)}“ wird endgültig entfernt.`, { okText: 'Löschen', gefahr: true });
+    if (ok) {
+      aendern((d) => {
+        if (IST_FAHRT(z)) d.fahrten = d.fahrten.filter((x) => x.id !== z.quelle.id);
+        else d.buchungen = d.buchungen.filter((x) => x.id !== z.quelle.id);
+      });
+    }
+  }
+  neu();
 }
 
 /* ---------- Summen ---------- */
@@ -243,13 +456,15 @@ function summen(liste) {
   ]);
 
   const saldo = einnahmen - ausgaben;
+  // Ausgaben stehen positiv da. Ohne den Umweg zeigte eine leere Gruppe „-0 €“.
+  const aus = (v) => (v ? -v : 0);
 
   return el('div.summen', {}, [
     kachel('Einnahmen', eur(einnahmen, 0), 'Miete + freie Einnahmen'),
-    kachel('Betriebskosten', eur(-proGruppe.Betriebskosten, 0), 'nicht umlagefähig'),
-    kachel('Erhaltung', eur(-proGruppe.Erhaltung, 0), 'Reparaturen, Rücklage'),
-    kachel('Sonst. Werbungskosten', eur(-proGruppe['Sonstige Werbungskosten'], 0), 'Fahrten, Beratung …'),
-    kachel('Finanzierung', eur(-proGruppe.Finanzierung, 0), 'Zins, Tilgung, Sondertilgung'),
+    kachel('Betriebskosten', eur(aus(proGruppe.Betriebskosten), 0), 'nicht umlagefähig'),
+    kachel('Erhaltung', eur(aus(proGruppe.Erhaltung), 0), 'Reparaturen, Rücklage'),
+    kachel('Sonst. Werbungskosten', eur(aus(proGruppe['Sonstige Werbungskosten']), 0), 'Fahrten, Beratung …'),
+    kachel('Finanzierung', eur(aus(proGruppe.Finanzierung), 0), 'Zins, Tilgung, Sondertilgung'),
     kachel('Saldo', eur(saldo, 0), 'Einnahmen abzüglich Ausgaben', saldo >= 0 ? 'pos' : 'neg'),
     kachel('Durchlaufend', eur(durchlaufend, 0), 'Umlagen ↔ umlagefähige Kosten'),
     // Nur zeigen, wo der Zahlungseingang überhaupt verfolgt wird.

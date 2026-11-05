@@ -1,6 +1,6 @@
 /* Einstieg: Startbildschirm, Ordnerverbindung, Navigation, Router. */
 
-import { $, el, leeren, toast, abfragen, modal } from './util.js';
+import { $, el, leeren, toast, abfragen, modal, HANDY_MEDIA } from './util.js';
 import {
   istUnterstuetzt, verfuegbareAblagen, ablageWaehlen, rechtePruefen, ablageMerken,
   gemerkteAblage, ablageUebernehmen, portfolioLesen, sofortSpeichern, datenquelle, speicher,
@@ -9,7 +9,7 @@ import {
 import { aufApple, speicherWarnung } from './speicher/lokal.js';
 import * as dbx from './speicher/dropboxApi.js';
 import { anbinden as abgleichAnbinden, anzeigeAnmelden } from './abgleich.js';
-import { hinweis, kartenListe } from './felder.js';
+import { hinweis, kartenListe, kartenKlappen, breiteTabellen, langeHinweise } from './felder.js';
 import { state, laden, neuesPortfolio, abonnieren, objekt as objektMit } from './store.js';
 import { steuerModus, setSteuerModus } from './kennzahlen.js';
 import { dashboard } from './views/dashboard.js';
@@ -89,6 +89,10 @@ const ANSICHTEN = {
 
 const REIHENFOLGE = ['dashboard', 'objekte', 'mietvertraege', 'finanzierungen', 'buchhaltung', 'steuerjahr', 'forecast', 'einzelobjekt', 'einstellungen'];
 
+/* Leiste unten am Handy: vier Hauptziele, alles Übrige hinter „Mehr“. */
+const TABS = [['dashboard', 'Start'], ['objekte', 'Objekte'], ['buchhaltung', 'Buchhaltung'], ['forecast', 'Forecast']];
+const MEHR_ICON = '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>';
+
 /* ---------- Design ---------- */
 
 function themaSetzen(thema) {
@@ -135,7 +139,7 @@ function listenBeobachten() {
   new MutationObserver(() => {
     if (geplant) return;
     geplant = true;
-    requestAnimationFrame(() => { geplant = false; kartenListe(ziel); });
+    requestAnimationFrame(() => { geplant = false; aufbereiten(ziel); });
   }).observe(ziel, { childList: true, subtree: true });
 }
 
@@ -467,7 +471,11 @@ function appStarten() {
   });
 
   navAufbauen();
+  tabLeisteAufbauen();
   steuerUmschalterAufbauen();
+  /* Wechselt das Gerät die Breite (iPad drehen, Fenster ziehen), baut die
+     Ansicht neu – Buchhaltung und Karten sehen am Handy anders aus. */
+  matchMedia(HANDY_MEDIA).addEventListener('change', () => routen());
   chromeAktualisieren();
   abonnieren(chromeAktualisieren);
 
@@ -516,22 +524,38 @@ function navAufbauen() {
   }
 }
 
+/** Leiste unten am Handy. „Mehr“ öffnet die Schublade mit allen Zielen. */
+function tabLeisteAufbauen() {
+  const leiste = leeren($('#tabLeiste'));
+  const svg = (pfad) => `<svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${pfad}</svg>`;
+  for (const [key, text] of TABS) {
+    leiste.append(el('a.tab', { href: '#/' + key, dataset: { key } }, [
+      el('span.tab-icon', { html: svg(ICONS[key]) }), el('span', { text }),
+    ]));
+  }
+  leiste.append(el('button.tab', {
+    type: 'button', dataset: { key: 'mehr' }, 'aria-controls': 'nav',
+    onclick: () => schubladeUmschalten(true),
+  }, [el('span.tab-icon', { html: svg(MEHR_ICON) }), el('span', { text: 'Mehr' })]));
+}
+
 /** Umschalter „vor Steuern / nach Steuern“ – wirkt auf alle Ansichten. */
 function steuerUmschalterAufbauen() {
   const box = leeren($('#steuerModus'));
-  for (const [wert, text, titel] of [
-    ['vor', 'vor St.', 'Cashflow vor Steuern'],
-    ['nach', 'nach St.', 'Cashflow nach Steuern – mit AfA und persönlichem Steuersatz'],
+  for (const [wert, text, kurz, titel] of [
+    ['vor', 'vor St.', 'vor', 'Cashflow vor Steuern'],
+    ['nach', 'nach St.', 'nach', 'Cashflow nach Steuern – mit AfA und persönlichem Steuersatz'],
   ]) {
+    // Zwei Beschriftungen: am Handy die kurze, sonst bräche „nach St.“ zweizeilig um.
     box.append(el('button' + (steuerModus() === wert ? '.aktiv' : ''), {
-      type: 'button', text, title: titel,
+      type: 'button', title: titel, 'aria-label': titel,
       onclick: () => {
         if (steuerModus() === wert) return;
         setSteuerModus(wert);
         steuerUmschalterAufbauen();
         routen();
       },
-    }));
+    }, [el('span.lang', { text }), el('span.kurz', { text: kurz })]));
   }
 }
 
@@ -574,6 +598,18 @@ function statusAnzeigen(status, detail) {
   if (status === 'error') toast('Speichern fehlgeschlagen. Prüfe die Ordnerrechte.', 'err', 7000);
 }
 
+/**
+ * Nach jedem Aufbau, auch dem einer einzelnen Karte: Listen als Karten
+ * beschriften, Karten einklappbar machen, breite Tabellen scrollbar,
+ * lange Hinweise kürzen. Jede Funktion merkt sich, was sie schon getan hat.
+ */
+function aufbereiten(wurzel) {
+  kartenListe(wurzel);
+  kartenKlappen(wurzel);
+  breiteTabellen(wurzel);
+  langeHinweise(wurzel);
+}
+
 function routen() {
   const key = (location.hash.replace(/^#\//, '') || 'dashboard').split('?')[0];
   if (key === 'zahlungen') {   // alte Route, seit dem Ausbau zur Buchhaltung umbenannt
@@ -586,6 +622,10 @@ function routen() {
   for (const a of document.querySelectorAll('.nav-item')) {
     a.classList.toggle('active', a.dataset.key === aktiv);
   }
+  const tabAktiv = TABS.some(([k]) => k === aktiv) ? aktiv : 'mehr';
+  for (const t of document.querySelectorAll('.tab')) {
+    t.classList.toggle('active', t.dataset.key === tabAktiv);
+  }
   $('#viewTitle').textContent = typeof cfg.titel === 'function' ? cfg.titel() : cfg.titel;
 
   const container = leeren($('#view'));
@@ -593,7 +633,7 @@ function routen() {
   cfg.view.render(container);
   /* Nach jedem Aufbau: Listentabellen beschriften, damit sie auf schmalen
      Geraeten als Karten lesbar sind. Siehe kartenListe() in felder.js. */
-  kartenListe(container);
+  aufbereiten(container);
   schubladeSchliessen();
 }
 

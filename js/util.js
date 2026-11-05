@@ -133,7 +133,15 @@ export function toast(text, art = 'info', dauer = 3800) {
  * Modal mit eigenem Inhalt. resolve(wert) wird über den zurückgegebenen
  * Kontext aus den Buttons heraus aufgerufen.
  */
-export function modal({ titel, beschreibung, inhalt, buttons = [], breite }) {
+/**
+ * Handybreite – die Grenze, ab der die App auf Daumenbedienung umstellt:
+ * Leiste unten, einklappbare Karten, Buchhaltung als Liste mit Fenster.
+ * Dieselbe Zahl steht in app.css (@media max-width: 599px).
+ */
+export const HANDY_MEDIA = '(max-width: 599px)';
+export const istHandy = () => typeof matchMedia === 'function' && matchMedia(HANDY_MEDIA).matches;
+
+export function modal({ titel, beschreibung, inhalt, buttons = [], breite, fokus = true }) {
   return new Promise((resolve) => {
     const root = document.getElementById('modalRoot');
     const box = el('div.modal', breite ? { style: `max-width:${breite}px` } : {});
@@ -168,8 +176,10 @@ export function modal({ titel, beschreibung, inhalt, buttons = [], breite }) {
     document.addEventListener('keydown', onKey);
     root.append(backdrop);
 
-    const fokus = box.querySelector('input, select, textarea, .btn-primary');
-    if (fokus) fokus.focus();
+    /* Am Handy holt ein fokussiertes Feld sofort die Tastatur hoch – bei einem
+       Fenster, das man oft nur zum Abhaken öffnet, ist das störend. */
+    const ziel = fokus ? box.querySelector('input, select, textarea, .btn-primary') : null;
+    if (ziel) ziel.focus();
   });
 }
 
