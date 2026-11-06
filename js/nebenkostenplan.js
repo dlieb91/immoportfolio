@@ -16,7 +16,7 @@
 import { state, objekt as objektMit, besitzMonate } from './store.js';
 import { monatszahlungen, KATEGORIEN } from './zahlungen.js';
 import {
-  positionen, betragImMonat, gruppeVon, kostenart, positionName, zahlungsart,
+  positionen, betragImMonat, gruppeVon, kostenart, positionName, zahlungsart, giltImJahr,
 } from './betriebskosten.js';
 
 const leer = () => new Array(12).fill(0);
@@ -48,10 +48,12 @@ export function kostenplan(objektIds, jahr, zusammenfassen = false) {
 
   for (const o of objekte) {
     for (const pos of positionen(o)) {
+      if (!giltImJahr(pos, jahr)) continue;
       positionenAnzahl++;
       if (kostenart(pos.art).sammel && pos.betrag) sammelposten++;
       const gruppe = gruppeVon(pos);
-      const key = zusammenfassen ? `${gruppe}|${pos.art}` : pos.id;
+      // Stände derselben Position (kette) bilden eine Zeile
+      const key = zusammenfassen ? `${gruppe}|${pos.art}` : (pos.kette || pos.id);
       let z = zeilen.get(key);
       if (!z) {
         z = {
@@ -66,7 +68,7 @@ export function kostenplan(objektIds, jahr, zusammenfassen = false) {
       z.anzahl++;
       for (let m = 1; m <= 12; m++) {
         if (!imBestand(o, jahr, m)) continue;
-        const b = betragImMonat(pos, m);
+        const b = betragImMonat(pos, m, jahr);
         if (!b) continue;
         z.monate[m - 1] += b;
         z.jahr += b;
@@ -116,7 +118,7 @@ export function doppelteErfassung(objektIds, jahr) {
   const raus = [];
   for (const o of objekte) {
     for (const [kategorie, art] of Object.entries(BUCHUNG_ZU_ART)) {
-      if (!positionen(o).some((p) => p.art === art && p.betrag)) continue;
+      if (!positionen(o).some((p) => p.art === art && p.betrag && giltImJahr(p, jahr))) continue;
       const anzahl = (state.daten.buchungen || []).filter((b) => b.objektId === o.id
         && b.kategorie === kategorie && (b.datum || '').startsWith(String(jahr))).length;
       if (anzahl) raus.push({ objektId: o.id, objekt: o.bezeichnung || 'Ohne Bezeichnung', art, text: kostenart(art).text, anzahl });

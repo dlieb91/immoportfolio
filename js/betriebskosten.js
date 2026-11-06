@@ -9,7 +9,15 @@
        rhythmus,               // 'monatlich' | 'vierteljaehrlich' | 'halbjaehrlich' | 'jaehrlich'
        ersterMonat,            // 1–12, erste Fälligkeit im Jahr
        umlagefaehig,           // auf die Mieter umgelegt (Vorgabe aus der Kostenart)
-       imHausgeld }            // Teil des WEG-Hausgelds, wird monatlich gezahlt
+       imHausgeld,             // Teil des WEG-Hausgelds, wird monatlich gezahlt
+       ab, bis,                // 'JJJJ-MM' oder leer: Gültigkeit, beide Grenzen einschließlich
+       kette }                 // gemeinsame Kennung aller Stände einer Position
+
+   Ändert sich ein Betrag ab einem Monat, wird die Position nicht
+   überschrieben, sondern geteilt (abAendern): Der alte Stand endet im
+   Vormonat, der neue beginnt im Änderungsmonat. So bleiben vergangene
+   Monate – und damit abgeschlossene Steuerjahre – unverändert. Positionen
+   ohne ab/bis gelten immer; so sehen alle Daten vor Schema 16 aus.
 
    Eine Position im Hausgeld ist immer monatlich: Die Gemeinschaft zieht ein
    Zwölftel des Wirtschaftsplans ein, gleich wann sie selbst die Rechnung
@@ -106,8 +114,73 @@ export const zahlungenProJahr = (pos) => faelligeMonate(pos).length;
 
 export const jahresbetrag = (pos) => (pos.betrag || 0) * zahlungenProJahr(pos);
 
-export function betragImMonat(pos, monat) {
+/* ---------- Gültigkeit ---------- */
+
+export const periodeVon = (jahr, monat) => `${jahr}-${String(monat).padStart(2, '0')}`;
+
+/** Laufender Monat als 'JJJJ-MM'. */
+export function laufendePeriode() {
+  const d = new Date();
+  return periodeVon(d.getFullYear(), d.getMonth() + 1);
+}
+
+/** Monat davor, 'JJJJ-MM'. */
+export function monatVor(p) {
+  let [j, m] = p.split('-').map(Number);
+  m -= 1;
+  if (m < 1) { m = 12; j -= 1; }
+  return periodeVon(j, m);
+}
+
+/** Gilt die Position im Monat p ('JJJJ-MM')? */
+export const giltIm = (pos, p) => (!pos.ab || p >= pos.ab) && (!pos.bis || p <= pos.bis);
+
+/** Gilt die Position in irgendeinem Monat des Jahres? */
+export const giltImJahr = (pos, jahr) => (!pos.ab || pos.ab <= `${jahr}-12`) && (!pos.bis || pos.bis >= `${jahr}-01`);
+
+/** Ausgelaufen: Ende liegt vor dem Monat p. */
+export const ausgelaufen = (pos, p) => !!pos.bis && pos.bis < p;
+
+/**
+ * Betrag im Monat. Mit `jahr` wird die Gültigkeit geprüft; ohne `jahr`
+ * zählt nur das Fälligkeitsmuster (für Jahreswerte eines Stands).
+ */
+export function betragImMonat(pos, monat, jahr) {
+  if (jahr != null && !giltIm(pos, periodeVon(jahr, monat))) return 0;
   return faelligeMonate(pos).includes(monat) ? (pos.betrag || 0) : 0;
+}
+
+const cent = (v) => Math.round(v * 100) / 100;
+
+/**
+ * Betrag einer Position ab Monat `ab` ändern. Liefert die Liste der Stände,
+ * die an die Stelle von `pos` treten: Beginnt die Position erst in `ab` oder
+ * später, wird sie selbst geändert; sonst endet sie im Vormonat und ein neuer
+ * Stand mit dem neuen Betrag beginnt in `ab` (Ende übernommen).
+ */
+export function abAendern(pos, ab, betrag, neueId) {
+  if (pos.bis && ab > pos.bis) return [pos];
+  if (!pos.ab || ab > pos.ab) {
+    const kette = pos.kette || pos.id;
+    return [
+      { ...pos, kette, bis: monatVor(ab) },
+      { ...pos, id: neueId(), kette, ab, betrag },
+    ];
+  }
+  return [{ ...pos, betrag }];
+}
+
+/**
+ * Neuer Wirtschaftsplan: alle Positionen, die im Monat `ab` gelten und den
+ * Filter erfüllen, ab dann um `prozent` ändern. Liefert die neue Liste.
+ */
+export function planAnpassen(liste, ab, prozent, neueId, filter = () => true) {
+  const raus = [];
+  for (const pos of liste) {
+    if (!giltIm(pos, ab) || !filter(pos) || pos.betrag == null) { raus.push(pos); continue; }
+    raus.push(...abAendern(pos, ab, cent(pos.betrag * (1 + prozent / 100)), neueId));
+  }
+  return raus;
 }
 
 /** Gruppe der Übersicht: umlage | nichtUmlage | ruecklage */
@@ -130,16 +203,20 @@ export const positionen = (o) => (Array.isArray(o?.betriebskosten) ? o.betriebsk
 export const positionName = (pos) => (pos.bezeichnung || '').trim() || kostenart(pos.art).text;
 
 /**
- * Volle Jahreswerte je Zahlungsart – Grundlage der Renditen und des
- * Forecasts. `ruecklageGesetzt` unterscheidet „keine Rücklage-Position“
- * (der Forecast setzt die Pauschale an) von einer Position mit 0 €.
+ * Volle Jahreswerte je Zahlungsart nach dem Stand im Monat `stand`
+ * ('JJJJ-MM' oder ISO-Datum, Vorgabe: laufender Monat) – Grundlage der
+ * Renditen und des Forecasts. `ruecklageGesetzt` unterscheidet „keine
+ * Rücklage-Position“ (der Forecast setzt die Pauschale an) von einer
+ * Position mit 0 €.
  */
-export function kostenJahr(o) {
+export function kostenJahr(o, stand = laufendePeriode()) {
+  const p = String(stand).slice(0, 7);
   const raus = {
     betriebskostenUmlagefaehig: 0, hausgeld: 0, verwaltung: 0, instandhaltung: 0, sonstige: 0,
     ruecklageGesetzt: false,
   };
   for (const pos of positionen(o)) {
+    if (!giltIm(pos, p)) continue;
     if (pos.art === 'ruecklage' && pos.betrag != null) raus.ruecklageGesetzt = true;
     raus[zahlungsart(pos)] += jahresbetrag(pos);
   }
@@ -150,10 +227,10 @@ export function kostenJahr(o) {
  * Summen je Zahlungsart für einen Monat, dazu die Namen der Positionen –
  * für die Monatszeilen der Buchhaltung und die Herleitung der Anlage V.
  */
-export function monatsSummen(o, monat) {
+export function monatsSummen(o, monat, jahr) {
   const raus = new Map();
   for (const pos of positionen(o)) {
-    const betrag = betragImMonat(pos, monat);
+    const betrag = betragImMonat(pos, monat, jahr);
     if (!betrag) continue;
     const art = zahlungsart(pos);
     const e = raus.get(art) || { betrag: 0, namen: [] };

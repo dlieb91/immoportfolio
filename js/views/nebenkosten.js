@@ -10,6 +10,7 @@ import { state, objekt as objektMit } from '../store.js';
 import { hinweis } from '../felder.js';
 import { kostenplan, doppelteErfassung } from '../nebenkostenplan.js';
 import { laufenderMonat } from '../zahlungen.js';
+import { ohneVorauszahlung } from '../buchhaltung.js';
 
 const MONAT_KURZ = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
 const MONAT_LANG = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
@@ -75,6 +76,12 @@ export const nebenkosten = {
       inner.append(hinweis('<strong>Möglicherweise doppelt erfasst:</strong> '
         + doppelt.map((d) => `${d.text} bei „${d.objekt}“ als Position und als ${d.anzahl} Buchung${d.anzahl > 1 ? 'en' : ''}`).join('; ')
         + `. Beides zählt in Cashflow und Steuer ${jahr}. Lösche entweder die Buchungen oder die Position.`, 'warn'));
+    }
+    const ohneNk = ohneVorauszahlung().filter((x) => !sicht.objekt || x.o.id === sicht.objekt);
+    if (ohneNk.length) {
+      inner.append(hinweis('<strong>Ohne Nebenkosten-Vorauszahlung:</strong> '
+        + ohneNk.map((x) => `${x.mv.mieter || 'ohne Mieter'} (${x.o.bezeichnung || 'Objekt'})`).join(', ')
+        + '. Dort fehlen die Umlagen auf der Einnahmenseite – trag die Vorauszahlung im Mietvertrag ein, falls eine vereinbart ist.', 'warn'));
     }
     inner.append(istHandy() ? monatsKarte(plan, sicht, neu) : tabellenKarte(plan, sicht));
     inner.append(el('div.hint', { html:

@@ -203,7 +203,7 @@ export function monatszahlungen(o, jahr, monat) {
        Umlagefaehig heisst: der Mieter zahlt es letztlich ueber die Vorauszahlung
        (Art 'nebenkosten'). Steuerlich ist es trotzdem eine Werbungskostenposition –
        bei Leerstand ist es das sogar ohne Gegenbuchung, siehe kennzahlen.js. */
-    const summen = monatsSummen(o, monat);
+    const summen = monatsSummen(o, monat, jahr);
     for (const art of ['betriebskostenUmlagefaehig', 'hausgeld', 'verwaltung', 'instandhaltung', 'sonstige']) {
       const s = summen.get(art);
       if (s?.betrag) zeile(art, o.id, s.namen.join(', '), s.betrag);
@@ -345,6 +345,9 @@ function imZeitraum(datum, jahr, bisMonat) {
   return j === jahr && m <= bisMonat;
 }
 
+/** Erhaltungsbuchung, die die Gemeinschaft aus der Rücklage bezahlt hat. */
+export const ausRuecklageBezahlt = (b) => b?.kategorie === 'erhaltung' && !!b.ausRuecklage;
+
 function jahresSummenRechnen(objektId, jahr, bisMonat) {
   const o = objektMit(objektId);
   const summe = { mieteMonate: 0, korrekturen: 0, mietrueckstand: 0, rueckstandSeit: null };
@@ -373,8 +376,14 @@ function jahresSummenRechnen(objektId, jahr, bisMonat) {
   // (§ 11 EStG) – die Verteilung groesseren Erhaltungsaufwands auf mehrere
   // Jahre (§ 82b EStDV) ist eine rein steuerliche Zuordnung und wird erst in
   // kennzahlen.js auf die Einkuenfte angewendet, nicht hier auf den Cashflow.
+  summe.erhaltungAusRuecklage = 0;
   for (const b of state.daten.buchungen || []) {
     if (b.objektId !== objektId || !imZeitraum(b.datum, jahr, bisMonat)) continue;
+    /* Aus der Erhaltungsrücklage der Gemeinschaft bezahlt: Das Geld ist
+       schon mit dem Hausgeld abgeflossen (Art 'instandhaltung'), im Cashflow
+       stünde es sonst doppelt. Steuerlich zählt es dagegen jetzt – über
+       erhaltungSteuerlich(), das die Buchung selbst liest (BFH IX R 19/24). */
+    if (ausRuecklageBezahlt(b)) { summe.erhaltungAusRuecklage += b.betrag || 0; continue; }
     if (summe[b.kategorie] !== undefined) summe[b.kategorie] += b.betrag || 0;
   }
   for (const f of state.daten.fahrten || []) {

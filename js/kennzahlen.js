@@ -306,7 +306,7 @@ export function objektKennzahlen(o, stichtag = heuteISO()) {
      Für das Kalenderjahr anteilig nach Besitzmonaten, damit ein
      Anschaffungsjahr nicht zwölf Monate Kosten gegen zehn Monate Miete
      stellt. Die Volljahreswerte bleiben Grundlage aller Renditen. */
-  const k = kostenJahr(o);
+  const k = kostenJahr(o, stichtag);
   const hausgeldVoll = k.hausgeld;
   const verwaltungVoll = k.verwaltung;
   const instandhaltungVoll = k.instandhaltung;

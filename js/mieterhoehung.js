@@ -35,6 +35,21 @@ function konditionAm(mv, stichtag) {
   return gueltige.at(-1) || null;
 }
 
+/**
+ * Beginn der zum Stichtag geltenden Kaltmiete. Eine Kondition, die nur die
+ * Nebenkosten-Vorauszahlung ändert, ist keine Mietänderung – sonst liefe die
+ * Sperrfrist nach jeder Anpassung der Vorauszahlung neu.
+ */
+function kaltmieteSeit(mv, stichtag) {
+  const gueltige = (mv.konditionen || [])
+    .filter((k) => k.gueltigAb && k.gueltigAb <= stichtag)
+    .sort((a, b) => a.gueltigAb.localeCompare(b.gueltigAb));
+  let i = gueltige.length - 1;
+  if (i < 0) return null;
+  while (i > 0 && (gueltige[i - 1].kaltmiete || 0) === (gueltige[i].kaltmiete || 0)) i--;
+  return gueltige[i].gueltigAb;
+}
+
 /** Die Kappungsgrenze dieses Objekts: Vorgabe aus den Einstellungen, sofern nichts Eigenes steht. */
 export function kappungsgrenzeVon(objekt) {
   const eigen = objekt?.kappungsgrenzeAbweichend;
@@ -73,7 +88,7 @@ export function mieterhoehungsPotenzial(mv, stichtag = heuteISO()) {
 
   /* Massgeblich ist die letzte Mietaenderung, nicht der Vertragsbeginn: Nach
      einer Erhoehung laeuft die Sperrfrist neu. */
-  const letzteAenderung = jetzt.gueltigAb;
+  const letzteAenderung = kaltmieteSeit(mv, stichtag) || jetzt.gueltigAb;
   const verlangenAb = datumPlus({ monate: 12 }, isoZuDate(letzteAenderung));
   const wirksamAb = datumPlus({ monate: 15 }, isoZuDate(letzteAenderung));
 
@@ -209,11 +224,11 @@ export function indexAnpassung(mv, neuerStand, stichtag = heuteISO()) {
   const jetzt = konditionAm(mv, stichtag);
   const alteMiete = jetzt?.kaltmiete || 0;
   const basisStand = mv.indexBasisStand ?? null;
-  const basisDatum = mv.indexBasisDatum || jetzt?.gueltigAb || null;
+  const basisDatum = mv.indexBasisDatum || kaltmieteSeit(mv, stichtag) || null;
 
   /* Ein Jahr unveraendert (§ 557b Abs. 2 S. 1) – ab der letzten
      Mietaenderung, nicht ab Vertragsbeginn. */
-  const seit = jetzt?.gueltigAb || mv.beginn;
+  const seit = kaltmieteSeit(mv, stichtag) || mv.beginn;
   const fruehestensAb = seit ? datumPlus({ monate: 12 }, isoZuDate(seit)) : null;
   // Wirksam ab Beginn des uebernaechsten Monats nach Zugang der Erklaerung.
   const wirksamAb = monatsErster(datumPlus({ monate: 2 }, isoZuDate(stichtag)));
@@ -257,8 +272,10 @@ export function anpassungHinweis(mv, stichtag = heuteISO()) {
   if (!mv || vertragStatus(mv, stichtag) !== 'aktiv') return null;
 
   if (mv.anpassungTyp === 'staffel') {
+    const kaltJetzt = konditionAm(mv, stichtag)?.kaltmiete || 0;
+    // nur echte Staffelstufen, keine reine Anpassung der Vorauszahlung
     const naechste = (mv.konditionen || [])
-      .filter((k) => k.gueltigAb > stichtag)
+      .filter((k) => k.gueltigAb > stichtag && (k.kaltmiete || 0) !== kaltJetzt)
       .sort((a, b) => a.gueltigAb.localeCompare(b.gueltigAb))[0];
     if (!naechste) return null;
     const tage = Math.round((isoZuDate(naechste.gueltigAb) - isoZuDate(stichtag)) / 86400000);
@@ -273,7 +290,7 @@ export function anpassungHinweis(mv, stichtag = heuteISO()) {
 
   if (mv.anpassungTyp === 'index') {
     const jetzt = konditionAm(mv, stichtag);
-    const seit = jetzt?.gueltigAb || mv.beginn;
+    const seit = kaltmieteSeit(mv, stichtag) || mv.beginn;
     if (!seit) return null;
     const fruehestensAb = datumPlus({ monate: 12 }, isoZuDate(seit));
     if (stichtag < fruehestensAb) return null;

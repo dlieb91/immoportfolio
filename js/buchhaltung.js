@@ -23,7 +23,9 @@ import { heuteISO, datumPlus } from './util.js';
 import {
   state, objekt as objektMit, einheitMit, einheitName, objektVonEinheit,
   flaecheVon, einheitenVon, mieteEinheit, buchungenVon, fahrtenVon,
+  besitzMonate, aktiveVertraege, mieteVon,
 } from './store.js';
+import { kostenJahr } from './betriebskosten.js';
 import {
   KATEGORIEN, GRUPPEN, artInfo, zahlungsliste, jahresSummen, fahrtBetrag, monatszahlungen,
 } from './zahlungen.js';
@@ -117,32 +119,42 @@ export function buchungsliste(filter = {}) {
  * nach Wohnfläche verteilt, ersatzweise zu gleichen Teilen, wenn keine
  * Fläche hinterlegt ist. Ergebnis positiv heisst Nachzahlung des Mieters,
  * negativ heisst Erstattung durch den Vermieter.
+ *
+ * Zeitanteilig: War die Einheit nur einen Teil der Besitzmonate vermietet,
+ * trägt der Mieter nur diesen Teil der Jahreskosten – den Leerstand trägt
+ * der Vermieter (übliche Umlage nach Zeitanteil).
  */
+function flaechenanteilVon(e, o) {
+  const gesamtFlaeche = flaecheVon(o);
+  const anzahlEinheiten = Math.max(1, einheitenVon(o.id).length);
+  return gesamtFlaeche ? (e.flaeche || 0) / gesamtFlaeche : 1 / anzahlEinheiten;
+}
+
 export function nkAbrechnung(einheitId, jahr) {
   const e = einheitMit(einheitId);
   const o = objektVonEinheit(einheitId);
   if (!e || !o) return null;
 
   let vorauszahlung = 0, monateVermietet = 0;
+  const vertraege = [];
   for (let m = 1; m <= 12; m++) {
     const stichtag = `${jahr}-${String(m).padStart(2, '0')}-15`;
     const w = mieteEinheit(einheitId, stichtag);
     if (w.nk) vorauszahlung += w.nk;
     if (w.anzahl) monateVermietet++;
+    for (const mv of w.vertraege) if (!vertraege.includes(mv)) vertraege.push(mv);
   }
 
   const ist = jahresSummen(o.id, jahr);
-  const gesamtFlaeche = flaecheVon(o);
-  const anzahlEinheiten = Math.max(1, einheitenVon(o.id).length);
-  const flaechenanteil = gesamtFlaeche
-    ? (e.flaeche || 0) / gesamtFlaeche
-    : 1 / anzahlEinheiten;
-  const kosten = ist.betriebskostenUmlagefaehig * flaechenanteil;
+  const flaechenanteil = flaechenanteilVon(e, o);
+  const bestand = besitzMonate(o, jahr);
+  const zeitanteil = bestand ? Math.min(1, monateVermietet / bestand) : 0;
+  const kosten = ist.betriebskostenUmlagefaehig * flaechenanteil * zeitanteil;
 
   return {
     einheitId, objektId: o.id, jahr,
     vorauszahlung, kosten, ergebnis: kosten - vorauszahlung,
-    flaechenanteil, monateVermietet,
+    flaechenanteil, zeitanteil, monateVermietet, vertraege,
   };
 }
 
@@ -151,6 +163,93 @@ export function nkAbrechnungObjekt(objektId, jahr) {
   return einheitenVon(objektId)
     .map((e) => nkAbrechnung(e.id, jahr))
     .filter(Boolean);
+}
+
+/**
+ * Frist der Abrechnung (§ 556 Abs. 3 BGB): Sie muss dem Mieter spätestens
+ * zwölf Monate nach Ende des Abrechnungszeitraums zugehen, danach ist eine
+ * Nachforderung ausgeschlossen. Abrechnungszeitraum ist hier das Kalenderjahr.
+ */
+export const abrechnungsFrist = (jahr) => `${jahr + 1}-12-31`;
+
+/** Zustelldatum der Abrechnung einer Einheit für ein Jahr, sonst null. */
+export const abrechnungZugestellt = (e, jahr) => e?.nkZugestellt?.[jahr] || null;
+
+/** Die aus der Abrechnung angelegte Buchung (Nachzahlung oder Erstattung), sonst null. */
+export function abrechnungsBuchung(einheitId, jahr) {
+  return (state.daten.buchungen || []).find((b) => b.einheitId === einheitId && b.nkJahr === jahr
+    && (b.kategorie === 'nkNachzahlung' || b.kategorie === 'nkErstattung')) || null;
+}
+
+/** Felder der Buchung zum Ergebnis einer Abrechnung – angelegt wird in der Ansicht. */
+export function abrechnungsBuchungFelder(n, mieterText) {
+  const nach = n.ergebnis >= 0;
+  return {
+    einheitId: n.einheitId, nkJahr: n.jahr,
+    kategorie: nach ? 'nkNachzahlung' : 'nkErstattung',
+    betrag: Math.round(Math.abs(n.ergebnis) * 100) / 100,
+    bezeichnung: `Nebenkostenabrechnung ${n.jahr}${mieterText ? ' · ' + mieterText : ''}`,
+  };
+}
+
+/**
+ * Angemessene monatliche Vorauszahlung je Einheit (§ 560 Abs. 4 BGB):
+ * umlagefähige Jahreskosten laut Positionen zum Stand `stand`, nach
+ * Wohnfläche verteilt, durch zwölf, auf volle Euro aufgerundet.
+ * `relevant`, wenn der Vorschlag um mindestens 5 € und 5 % abweicht.
+ */
+export function vorauszahlungVorschlag(einheitId, stand = heuteISO()) {
+  const e = einheitMit(einheitId);
+  const o = objektVonEinheit(einheitId);
+  if (!e || !o) return null;
+  const vertraege = aktiveVertraege(einheitId, stand);
+  if (!vertraege.length) return null;
+  const jahreskosten = kostenJahr(o, stand).betriebskostenUmlagefaehig * flaechenanteilVon(e, o);
+  const aktuell = vertraege.reduce((s, mv) => s + mieteVon(mv, stand).nk, 0);
+  const vorschlag = Math.ceil(jahreskosten / 12);
+  const differenz = vorschlag - aktuell;
+  return {
+    einheitId, jahreskosten, aktuell, vorschlag, differenz,
+    mv: vertraege.length === 1 ? vertraege[0] : null,
+    relevant: jahreskosten > 0 && Math.abs(differenz) >= 5 && Math.abs(differenz) >= aktuell * 0.05,
+  };
+}
+
+/**
+ * Laufende Verträge ohne Nebenkosten-Vorauszahlung in Objekten mit
+ * umlagefähigen Kosten – dort rechnet die App keine Umlagen, die Kosten
+ * stehen allein als Werbungskosten da wie bei Leerstand.
+ */
+export function ohneVorauszahlung(stand = heuteISO()) {
+  const raus = [];
+  for (const o of state.daten.objekte) {
+    if (!(kostenJahr(o, stand).betriebskostenUmlagefaehig > 0)) continue;
+    for (const e of einheitenVon(o.id)) {
+      for (const mv of aktiveVertraege(e.id, stand)) {
+        if (!mieteVon(mv, stand).nk) raus.push({ o, e, mv });
+      }
+    }
+  }
+  return raus;
+}
+
+/**
+ * Abrechnungen des Vorjahres, die noch nicht als zugestellt vermerkt sind –
+ * nur Einheiten mit Vorauszahlung, denn nur dort gilt die Frist.
+ */
+export function offeneAbrechnungen(heute = heuteISO()) {
+  const jahr = Number(heute.slice(0, 4)) - 1;
+  const frist = abrechnungsFrist(jahr);
+  const tageRest = Math.round((Date.parse(frist) - Date.parse(heute.slice(0, 10))) / 864e5);
+  const liste = [];
+  for (const o of state.daten.objekte) {
+    for (const e of einheitenVon(o.id)) {
+      if (abrechnungZugestellt(e, jahr)) continue;
+      const n = nkAbrechnung(e.id, jahr);
+      if (n && n.monateVermietet && n.vorauszahlung > 0) liste.push({ o, e, n });
+    }
+  }
+  return { jahr, frist, tageRest, liste };
 }
 
 /* ---------- Erhaltungsaufwand: 15-%-Grenze und § 82b EStDV ---------- */

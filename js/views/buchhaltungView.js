@@ -442,6 +442,8 @@ function summen(liste) {
        die Kacheln bleiben also unveraendert – siehe zahlungen.js. */
     const wert = z.ist ?? z.betrag;
     rueckstand += z.rueckstand || 0;
+    // Aus der Rücklage bezahlt: kein neuer Abfluss, das Geld ging mit dem Hausgeld
+    if (z.art === 'erhaltung' && z.quelle?.ausRuecklage) continue;
     proGruppe[a.gruppe] = (proGruppe[a.gruppe] || 0) + wert * a.vorzeichen;
     if (a.durchlaufend) durchlaufend += wert * a.vorzeichen;
     else if (a.gruppe === 'Neutral') neutral += wert * a.vorzeichen;
@@ -628,6 +630,7 @@ function manuelleZeile(z, neu) {
   if (!IST_FAHRT(z) && buchung.kategorie === 'erhaltung') {
     if (buchung.aktiviert) markierungen.push(el('span.badge.blau', { text: 'aktiviert', style: 'margin-left:6px' }));
     else if (buchung.verteilenJahre) markierungen.push(el('span.badge', { text: `verteilt ${buchung.verteilenJahre}J`, style: 'margin-left:6px' }));
+    if (buchung.ausRuecklage) markierungen.push(el('span.badge', { text: 'aus Rücklage', title: 'kein Abfluss, steuerlich abziehbar', style: 'margin-left:6px' }));
   }
 
   return el('tr.zeile-korrigiert', {}, [

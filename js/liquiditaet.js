@@ -20,7 +20,7 @@
 */
 
 import { state } from './store.js';
-import { monatszahlungen, wirkung, artInfo, fahrtBetrag } from './zahlungen.js';
+import { monatszahlungen, wirkung, artInfo, fahrtBetrag, ausRuecklageBezahlt } from './zahlungen.js';
 
 /** Addiert Monate auf eine Periode 'YYYY-MM'. */
 function periodePlus(periode, n) {
@@ -90,6 +90,7 @@ export function liquiditaetsvorschau(abPeriode, monate = 12, objektIds = null) {
     // Freie Buchungen: im Monat ihres Datums, auch wenn es in der Zukunft liegt.
     for (const b of state.daten.buchungen || []) {
       if (!ids.has(b.objektId) || !b.datum || b.datum.slice(0, 7) !== periode) continue;
+      if (ausRuecklageBezahlt(b)) continue; // schon mit dem Hausgeld abgeflossen
       buchen(b.kategorie, (b.betrag || 0) * artInfo(b.kategorie).vorzeichen);
     }
     for (const f of state.daten.fahrten || []) {

@@ -295,6 +295,7 @@ werden bewusst nicht verglichen; die laufen auf zwei Geräten ohnehin auseinande
 | 25 | Handy: Leiste unten, einklappbare Karten, Buchhaltung mit Fenster von unten | fertig |
 | 26 | Eingesetztes Eigenkapital einschließlich Sanierung | fertig |
 | 27 | Nebenkosten: Positionen mit Fälligkeit, Monatsübersicht, umlagefähig und Rücklage | fertig |
+| 28 | Nebenkosten: Gültigkeit ab/bis, Abrechnung buchen, Frist, Vorauszahlung anpassen, Rücklage-Entnahme | fertig |
 
 ## Aufbau des Codes
 
@@ -649,9 +650,28 @@ gerechnet, nicht eingetragen. Zwei Modi unter *Einstellungen*:
   häufigen Fahrten.
 
 **Nebenkostenabrechnung.** Für Objekte mit erfassten Einheiten zeigt die Objektansicht je
-Einheit und laufendem Jahr Vorauszahlung, anteilige umlagefähige Kosten (nach Wohnfläche
-verteilt) und das Ergebnis als Nachzahlung oder Erstattung. Eine Näherung fürs laufende Jahr,
-kein Ersatz für die formelle, rechtssichere Abrechnung.
+Einheit Vorauszahlung, anteilige umlagefähige Kosten und das Ergebnis als Nachzahlung oder
+Erstattung – vorgewählt für das **Vorjahr**, wählbar auch das laufende und das vorletzte Jahr.
+Verteilt wird nach Wohnfläche und **Mietdauer**: War eine Einheit nur einen Teil der
+Besitzmonate vermietet, trägt der Mieter nur diesen Teil, den Leerstand der Vermieter.
+Eine Näherung, kein Ersatz für die formelle, rechtssichere Abrechnung; bei einem Mieterwechsel
+im Jahr braucht es je Mieter eine eigene Abrechnung, die App rechnet je Einheit.
+
+- **Buchen:** legt das Ergebnis als *Nebenkosten-Nachzahlung* oder *-Erstattung* an, mit dem
+  Datum der Zahlung. Beides zählt als Umlage im Jahr, in dem das Geld fließt (§ 11 EStG).
+- **Zugestellt am:** Die Abrechnung muss dem Mieter spätestens zwölf Monate nach Ende des
+  Abrechnungszeitraums zugehen, sonst ist eine Nachforderung ausgeschlossen (§ 556 Abs. 3 BGB).
+  Solange für Einheiten mit Vorauszahlung kein Zustelldatum eingetragen ist, erinnert das
+  Dashboard an die Frist, in den letzten 90 Tagen als Warnung.
+- **Vorauszahlung anpassen:** Weicht die Vorauszahlung um mindestens 5 € und 5 % von den
+  umlagefähigen Kosten laut Positionen ab (Jahreskosten nach Wohnfläche ÷ 12, aufgerundet),
+  steht ein Vorschlag darunter; „Übernehmen“ legt im Mietvertrag eine neue Kondition mit
+  derselben Kaltmiete an (§ 560 Abs. 4 BGB). Spätere Staffelstufen übernehmen die neue
+  Vorauszahlung. Eine Kondition, die nur die Vorauszahlung ändert, setzt die Sperrfrist für
+  Mieterhöhungen nicht neu in Gang.
+- **Ohne Vorauszahlung:** Hat ein Objekt umlagefähige Kosten, ein laufender Vertrag aber keine
+  Vorauszahlung, warnen Dashboard, Kostenkarte und Nebenkosten-Übersicht – dann fehlen die
+  Umlagen auf der Einnahmenseite.
 
 **Nebenkosten.** Die laufenden Kosten eines Objekts werden als **Positionen** erfasst
 (Karte *Laufende Kosten*): Kostenart nach § 2 BetrKV oder nicht umlagefähig (Verwaltung,
@@ -674,6 +694,16 @@ Kosten sind Werbungskosten im Jahr der Zahlung (Betriebs- bzw. Verwaltungskosten
 Rücklage nicht (siehe unten). Das Steuerjahr zeigt dazu die Karte *Nebenkosten laut
 Positionen*, und die Herleitung nennt bei jeder Monatszeile die enthaltenen Positionen.
 
+**Änderungen ab einem Monat.** Jede Position kann ein *gilt ab* und *gilt bis* haben
+(Spalte *gilt*). Ein Betrag, der direkt in der Tabelle geändert wird, gilt für den ganzen
+Zeitraum der Position – also auch rückwirkend. Ändert sich ein Betrag ab einem Monat, teilt
+**„ab …“** die Position: Der bisherige Stand endet im Vormonat, der neue beginnt im gewählten
+Monat. Vergangene Monate, Buchhaltung und abgeschlossene Steuerjahre bleiben so unverändert.
+**„Neuer Wirtschaftsplan …“** macht das für alle Positionen auf einmal (wahlweise nur die im
+Hausgeld) mit einem Prozentsatz; einzelne Beträge lassen sich danach mit „ab …“ feinjustieren.
+Ausgelaufene Stände sind ausgeblendet („Frühere Stände anzeigen“). Renditen und Forecast
+rechnen mit dem Stand des laufenden Monats.
+
 Grenzen: Die Übersicht zeigt den **Plan** – Korrekturen einzelner Monate in der Buchhaltung
 ändern Buchhaltung und Steuer, nicht diese Tabelle. Wer Grundsteuer oder Versicherung zusätzlich
 als Buchung erfasst, zählt sie doppelt; die Übersicht weist darauf hin. Die Excel-Mappe kennt
@@ -691,8 +721,11 @@ AfA wirkender Herstellungsaufwand wird.
 Die App trennt das deshalb sauber: Die Position *Erhaltungsrücklage* am Objekt fließt in den
 Cashflow, bleibt aber aus Anlage V, Einkünften und Steuer heraus – in der Ist-Rechnung, in
 der Runrate und im Forecast gleichermaßen. **Sobald die Gemeinschaft das Geld ausgibt**,
-erfasst du den Betrag als Buchung der Kategorie *Erhaltungsaufwand*; dann greift er, mit
-allen Folgen aus § 82b EStDV und der 15-%-Grenze.
+erfasst du deinen Anteil als Buchung der Kategorie *Erhaltungsaufwand* und setzt bei
+Eigentumswohnungen den Haken **„aus der Rücklage bezahlt“**. Dann zählt der Betrag steuerlich
+in diesem Jahr, mit allen Folgen aus § 82b EStDV und der 15-%-Grenze – im Cashflow, in der
+Liquidität und in den Summen der Buchhaltung aber nicht, denn das Geld ist schon mit dem
+Hausgeld abgeflossen. Ohne den Haken stünde es dort doppelt.
 
 **Anhang: Herleitung der Werbungskosten.** Je Objekt schließt eine Karte die Aufstellung
 ab, die zeigt, woraus jede Position entstanden ist – und zwar aus denselben Quellen, aus

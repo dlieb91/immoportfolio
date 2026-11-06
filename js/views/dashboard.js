@@ -6,7 +6,9 @@ import {
   portfolioKennzahlen, steuerModus, cashflowAktuell, kapitalbindungPortfolio,
 } from '../kennzahlen.js';
 import { prognose, basisParameter } from '../forecast.js';
-import { erhaltungsAmpel, spekulationsfrist } from '../buchhaltung.js';
+import {
+  erhaltungsAmpel, spekulationsfrist, ohneVorauszahlung, offeneAbrechnungen, vorauszahlungVorschlag,
+} from '../buchhaltung.js';
 import { erhoehbareVertraege, anstehendeAnpassungen } from '../mieterhoehung.js';
 import { liquiditaetsvorschau } from '../liquiditaet.js';
 import { laufenderMonat } from '../zahlungen.js';
@@ -403,6 +405,43 @@ function warnungen() {
       text: (ampel.stufe === 'rot' ? 'Über der 15-%-Grenze: ' : 'Nähert sich der 15-%-Grenze: ')
         + (o.bezeichnung || 'Objekt'),
       detail: `Erhaltungsaufwand seit dem Kauf ${eur(ampel.summe, 0)} von ${eur(ampel.grenze, 0)}`,
+    });
+  }
+
+  /* Nebenkosten: Vertrag ohne Vorauszahlung, offene Abrechnung des
+     Vorjahres (Frist § 556 Abs. 3 BGB), zu niedrige Vorauszahlung. */
+  const ohneNk = ohneVorauszahlung(heute);
+  if (ohneNk.length) {
+    punkte.push({
+      art: 'warn', ziel: `#/objekt?id=${ohneNk[0].o.id}`,
+      text: `${ohneNk.length === 1 ? 'Ein Mietvertrag' : ohneNk.length + ' Mietverträge'} ohne Nebenkosten-Vorauszahlung`,
+      detail: ohneNk.slice(0, 3).map((x) => `${x.mv.mieter || 'ohne Mieter'} (${x.o.bezeichnung || 'Objekt'})`).join(', ')
+        + ' · das Objekt hat umlagefähige Kosten, ohne Vorauszahlung im Vertrag rechnet die App keine Umlagen',
+    });
+  }
+  const offen = offeneAbrechnungen(heute);
+  if (offen.liste.length) {
+    const objekte = [...new Set(offen.liste.map((x) => x.o))];
+    punkte.push({
+      art: offen.tageRest <= 90 ? 'warn' : 'info', ziel: `#/objekt?id=${objekte[0].id}`,
+      text: `Nebenkostenabrechnung ${offen.jahr}: ${offen.liste.length} Einheit${offen.liste.length === 1 ? '' : 'en'} noch nicht zugestellt`,
+      detail: `Frist ${datum(offen.frist)}, noch ${offen.tageRest} Tage (§ 556 Abs. 3 BGB) – danach keine Nachforderung mehr · `
+        + objekte.slice(0, 3).map((o) => o.bezeichnung || 'Objekt').join(', '),
+    });
+  }
+  const zuNiedrig = [];
+  for (const o of d.objekte) {
+    for (const e of einheitenVon(o.id)) {
+      const v = vorauszahlungVorschlag(e.id, heute);
+      if (v?.relevant && v.differenz > 0) zuNiedrig.push({ o, e, v });
+    }
+  }
+  if (zuNiedrig.length) {
+    punkte.push({
+      art: 'info', ziel: `#/objekt?id=${zuNiedrig[0].o.id}`,
+      text: `${zuNiedrig.length === 1 ? 'Eine Vorauszahlung deckt' : zuNiedrig.length + ' Vorauszahlungen decken'} die umlagefähigen Kosten nicht`,
+      detail: zuNiedrig.slice(0, 3).map((x) => `${x.o.bezeichnung || 'Objekt'}${einheitenVon(x.o.id).length > 1 ? ' · ' + einheitName(x.e) : ''}: `
+        + `${eur(x.v.aktuell, 0)} statt ${eur(x.v.vorschlag, 0)}`).join(', ') + ' · Anpassung nach der Abrechnung (§ 560 Abs. 4 BGB)',
     });
   }
 

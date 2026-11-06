@@ -1,12 +1,12 @@
 /* Objekt-Detailansicht: alle Parameter bearbeiten, Bilder verwalten, löschen. */
 
-import { el, leeren, eur, num, datum, uid, toast, bestaetigen, heuteISO, druckKnopf } from '../util.js';
+import { el, leeren, eur, num, datum, uid, toast, bestaetigen, heuteISO, druckKnopf, modal } from '../util.js';
 import {
   state, aendern, objekt as objektMit, nebenkostenBerechnen, nkPosition,
   einheitenVon, mietvertraegeZuObjekt, finanzierungenVon, GRUNDERWERBSTEUER,
   neueEinheit, einheitName, einheitSicherstellen, mieteEinheit, mieteVon,
   mieteObjekt, vertragStatus, vertragsEnde, verkehrswert, hauptbild,
-  neueBuchung, neueFahrt, buchungenVon, fahrtenVon,
+  neueBuchung, neueFahrt, buchungenVon, fahrtenVon, aktuelleKondition,
 } from '../store.js';
 import { bildURL, bildSpeichern, bildLoeschen } from '../storage.js';
 import {
@@ -16,6 +16,7 @@ import {
 } from '../felder.js';
 import {
   KOSTENARTEN, RHYTHMEN, kostenart, artVorgabe, neuePosition, jahresbetrag, kostenJahr,
+  laufendePeriode, giltIm, ausgelaufen, abAendern, planAnpassen, positionName,
 } from '../betriebskosten.js';
 import { OBJEKTTYPEN, ENERGIEKLASSEN, typText } from './objekte.js';
 import { anlegen as mietvertragAnlegen, STATUS_TEXT, STATUS_KLASSE } from './mietvertraege.js';
@@ -25,7 +26,11 @@ import {
 import {
   afaWerte, objektKennzahlen, steuerModus, effektiverSteuersatz, kapitalbindung,
 } from '../kennzahlen.js';
-import { KATEGORIEN, nkAbrechnungObjekt, erhaltungsAmpel, fahrtBetrag, spekulationsfrist, anschaffungsnahePruefung } from '../buchhaltung.js';
+import {
+  KATEGORIEN, nkAbrechnungObjekt, erhaltungsAmpel, fahrtBetrag, spekulationsfrist, anschaffungsnahePruefung,
+  abrechnungsFrist, abrechnungZugestellt, abrechnungsBuchung, abrechnungsBuchungFelder,
+  vorauszahlungVorschlag, ohneVorauszahlung,
+} from '../buchhaltung.js';
 import { dokumenteKarte, protokollKarte, dokumenteEntfernenFuer } from './dokumente.js';
 
 export const objektDetail = {
@@ -57,13 +62,14 @@ export const objektDetail = {
     const kpiBox = el('div', {}, [kennzahlen(o)]);
     const cfBox = el('div', {}, [cashflowKarte(o)]);
     const kapBox = el('div', {}, [kapitalKarte(o)]);
-    const nkBox = el('div', {}, [nkAbrechnungKarte(o)].filter(Boolean));
+    const nkBox = el('div');
     const obenNeu = () => {
       leeren(kpiBox).append(kennzahlen(o));
       leeren(cfBox).append(cashflowKarte(o));
       leeren(kapBox).append(kapitalKarte(o));
-      leeren(nkBox).append(...[nkAbrechnungKarte(o)].filter(Boolean));
+      leeren(nkBox).append(...[nkAbrechnungKarte(o, obenNeu)].filter(Boolean));
     };
+    nkBox.append(...[nkAbrechnungKarte(o, obenNeu)].filter(Boolean));
 
     inner.append(kopf(o));
     inner.append(kpiBox, cfBox, kapBox);
@@ -1062,15 +1068,114 @@ const MONATE_WAHL = MONATE_KURZ.map((m, i) => ({ wert: i + 1, text: m }));
  * Bezeichnung, Betrag je Fälligkeit, Zahlweise, „im Hausgeld“, „umlagefähig“.
  * Die Summen darunter sind dieselben, mit denen Cashflow und Steuer rechnen.
  */
+const FRUEHERE_KEY = 'immo-bk-fruehere';
+
+/** 'JJJJ-MM' → „Mär 2026“ */
+const monatText = (p) => (p ? `${MONATE_KURZ[Number(p.slice(5, 7)) - 1]} ${p.slice(0, 4)}` : '');
+
+function gueltigText(pos) {
+  if (pos.ab && pos.bis) return `${monatText(pos.ab)} – ${monatText(pos.bis)}`;
+  if (pos.ab) return `ab ${monatText(pos.ab)}`;
+  if (pos.bis) return `bis ${monatText(pos.bis)}`;
+  return 'immer';
+}
+
+/** Monatsfeld 'JJJJ-MM' – type=month, mit Prüfung für Browser ohne Monatsauswahl. */
+function monatEingabe(wert) {
+  return el('input', { type: 'month', value: wert, placeholder: 'JJJJ-MM', style: 'max-width:180px' });
+}
+const gueltigerMonat = (v) => /^\d{4}-(0[1-9]|1[0-2])$/.test(v || '');
+
+/** Betrag einer Position ab einem Monat ändern – vergangene Monate bleiben. */
+async function abMonatAendern(o, pos, fertig) {
+  const jetzt = laufendePeriode();
+  const vorschlag = pos.ab && pos.ab > jetzt ? pos.ab : jetzt;
+  const monat = monatEingabe(vorschlag);
+  const betrag = el('input', { type: 'text', inputmode: 'decimal', value: pos.betrag != null ? num(pos.betrag, 2) : '' });
+  const fehler = el('div.hint', { style: 'color:var(--neg)' });
+  const inhalt = el('div', {}, [
+    el('div.field', {}, [el('label', { text: 'Gilt ab Monat' }), monat]),
+    el('div.field', {}, [el('label', { text: 'Neuer Betrag je Fälligkeit (€)' }), betrag]),
+    el('div.hint', { text: 'Bis zum Vormonat bleibt der bisherige Betrag stehen – Buchhaltung und Steuer vergangener Monate ändern sich nicht.' }),
+    fehler,
+  ]);
+  const ok = await modal({
+    titel: `${positionName(pos)} ändern ab …`,
+    beschreibung: `Bisher ${eur(pos.betrag || 0)} · ${gueltigText(pos)}`,
+    inhalt,
+    buttons: [
+      { text: 'Abbrechen', wert: false },
+      {
+        text: 'Übernehmen', wert: true, klasse: 'btn-primary',
+        vorAbschluss: () => {
+          if (!gueltigerMonat(monat.value)) { fehler.textContent = 'Bitte einen Monat im Format JJJJ-MM angeben.'; return false; }
+          if (pos.bis && monat.value > pos.bis) { fehler.textContent = `Die Position endet ${monatText(pos.bis)}.`; return false; }
+          if (parseZahl(betrag.value) == null) { fehler.textContent = 'Bitte einen Betrag angeben.'; return false; }
+          return true;
+        },
+      },
+    ],
+  });
+  if (!ok) return;
+  const neu = abAendern(pos, monat.value, parseZahl(betrag.value), () => uid('bk'));
+  aendern(() => {
+    const i = o.betriebskosten.indexOf(pos);
+    o.betriebskosten.splice(i, 1, ...neu);
+  });
+  toast(neu.length > 1 ? `Neuer Betrag gilt ab ${monatText(monat.value)}.` : 'Betrag geändert.', 'ok');
+  fertig();
+}
+
+/** Neuer Wirtschaftsplan: alle (Hausgeld-)Positionen ab einem Monat um x % ändern. */
+async function planAbMonat(o, fertig) {
+  const jetzt = laufendePeriode();
+  const vorschlag = `${Number(jetzt.slice(0, 4)) + (Number(jetzt.slice(5, 7)) >= 7 ? 1 : 0)}-01`;
+  const hatHausgeld = o.betriebskosten.some((x) => x.imHausgeld);
+  const monat = monatEingabe(vorschlag);
+  const prozent = el('input', { type: 'text', inputmode: 'decimal', value: '', placeholder: 'z. B. 3,5 oder -2' });
+  const nurHausgeld = el('input', { type: 'checkbox', checked: hatHausgeld });
+  const fehler = el('div.hint', { style: 'color:var(--neg)' });
+  const ok = await modal({
+    titel: 'Neuer Wirtschaftsplan',
+    beschreibung: 'Ändert alle Positionen, die im gewählten Monat gelten, um denselben Prozentsatz. Einzelne Beträge kannst du danach mit „ab …“ feinjustieren.',
+    inhalt: el('div', {}, [
+      el('div.field', {}, [el('label', { text: 'Gilt ab Monat' }), monat]),
+      el('div.field', {}, [el('label', { text: 'Änderung in %' }), prozent]),
+      hatHausgeld ? el('label', { style: 'display:flex;gap:8px;align-items:center;font-size:14px;margin-top:6px' }, [nurHausgeld, 'nur Positionen im Hausgeld']) : null,
+      fehler,
+    ]),
+    buttons: [
+      { text: 'Abbrechen', wert: false },
+      {
+        text: 'Übernehmen', wert: true, klasse: 'btn-primary',
+        vorAbschluss: () => {
+          if (!gueltigerMonat(monat.value)) { fehler.textContent = 'Bitte einen Monat im Format JJJJ-MM angeben.'; return false; }
+          if (parseZahl(prozent.value) == null) { fehler.textContent = 'Bitte einen Prozentsatz angeben.'; return false; }
+          return true;
+        },
+      },
+    ],
+  });
+  if (!ok) return;
+  const filter = nurHausgeld.checked && hatHausgeld ? (x) => x.imHausgeld : () => true;
+  const vorher = o.betriebskosten.length;
+  aendern(() => { o.betriebskosten = planAnpassen(o.betriebskosten, monat.value, parseZahl(prozent.value), () => uid('bk'), filter); });
+  toast(`Wirtschaftsplan ab ${monatText(monat.value)} übernommen (${o.betriebskosten.length - vorher} neue Stände).`, 'ok');
+  fertig();
+}
+
 function kostenKarte(o, neuZeichnen, kennzahlenNeu) {
   if (!Array.isArray(o.betriebskosten)) o.betriebskosten = [];
-  const liste = o.betriebskosten;
+  const jetzt = laufendePeriode();
+  const fruehere = o.betriebskosten.filter((x) => ausgelaufen(x, jetzt));
+  const zeigeFruehere = localStorage.getItem(FRUEHERE_KEY) === '1';
+  const liste = o.betriebskosten.filter((x) => zeigeFruehere || !ausgelaufen(x, jetzt));
 
   const summenBox = el('div');
   const summenNeu = () => {
     const k = kostenJahr(o);
     const nichtUmlage = k.hausgeld + k.verwaltung + k.sonstige;
-    const hausgeldMonat = liste.filter((x) => x.imHausgeld).reduce((s, x) => s + jahresbetrag(x), 0) / 12;
+    const hausgeldMonat = o.betriebskosten.filter((x) => x.imHausgeld && giltIm(x, jetzt)).reduce((s, x) => s + jahresbetrag(x), 0) / 12;
     const zeile = (text, wert, unter, betont) => el('div', { style: 'display:flex;justify-content:space-between;gap:12px;padding:5px 0;font-size:13px' + (betont ? ';font-weight:600;border-top:1px solid var(--border);margin-top:4px;padding-top:9px' : '') }, [
       el('span', {}, [text, unter ? el('span.faint', { text: ' · ' + unter }) : null]),
       el('span.num', { text: wert }),
@@ -1097,7 +1202,7 @@ function kostenKarte(o, neuZeichnen, kennzahlenNeu) {
     return el('label', { style: 'display:flex;justify-content:center;cursor:pointer' }, [input]);
   };
 
-  const zeilen = liste.map((pos) => el('tr', {}, [
+  const zeilen = liste.map((pos) => el('tr', ausgelaufen(pos, jetzt) ? { style: 'opacity:.55' } : {}, [
     el('td', { style: 'min-width:190px' }, [tabellenAuswahl(pos, 'art', ARTEN_WAHL, {
       nach: () => {
         // Neue Kostenart: Vorgabe für umlagefähig und Zahlweise übernehmen
@@ -1109,14 +1214,21 @@ function kostenKarte(o, neuZeichnen, kennzahlenNeu) {
     })]),
     el('td', { style: 'min-width:140px' }, [tabellenText(pos, 'bezeichnung', { platzhalter: kostenart(pos.art).text })]),
     el('td', { style: 'width:110px' }, [tabellenZahl(pos, 'betrag', opt)]),
-    el('td', { style: 'width:155px' }, [pos.imHausgeld
+    el('td', { style: 'min-width:150px' }, [pos.imHausgeld
       ? el('span.faint', { text: 'monatlich', style: 'font-size:13px' })
       : tabellenAuswahl(pos, 'rhythmus', RHYTHMEN.map((r) => ({ wert: r.wert, text: r.text })), opt)]),
-    el('td', { style: 'width:90px' }, [pos.imHausgeld || pos.rhythmus === 'monatlich'
+    el('td', { style: 'min-width:95px' }, [pos.imHausgeld || pos.rhythmus === 'monatlich'
       ? el('span.faint', { text: '–' })
       : tabellenAuswahl(pos, 'ersterMonat', MONATE_WAHL, opt)]),
     el('td', { style: 'width:70px' }, [pruefen(pos, 'imHausgeld')]),
     el('td', { style: 'width:80px' }, [pruefen(pos, 'umlagefaehig')]),
+    el('td', { style: 'min-width:150px;white-space:nowrap' }, [
+      el('span', { style: 'font-size:13px', text: gueltigText(pos) + ' ' }),
+      ausgelaufen(pos, jetzt) ? null : el('button.btn.btn-sm', {
+        type: 'button', title: 'Betrag ab einem Monat ändern – vergangene Monate bleiben',
+        onclick: () => abMonatAendern(o, pos, () => { kennzahlenNeu(); neuZeichnen(); }),
+      }, ['ab …']),
+    ]),
     el('td.num', { style: 'width:100px', text: eur(jahresbetrag(pos), 0) }),
     el('td', { style: 'width:40px' }, [el('button.icon-mini', {
       type: 'button', title: 'Position entfernen', html: '&times;',
@@ -1130,9 +1242,10 @@ function kostenKarte(o, neuZeichnen, kennzahlenNeu) {
         el('thead', {}, [el('tr', {}, [
           el('th', { text: 'Kostenart' }), el('th', { text: 'Bezeichnung' }),
           el('th', { style: 'text-align:right', text: 'Betrag (€)' }),
-          el('th', { text: 'Zahlweise' }), el('th', { text: 'ab' }),
+          el('th', { text: 'Zahlweise' }), el('th', { text: 'fällig ab', title: 'erster Fälligkeitsmonat im Jahr' }),
           el('th', { style: 'text-align:center', text: 'Hausgeld' }),
           el('th', { style: 'text-align:center', text: 'umlagefähig' }),
+          el('th', { text: 'gilt' }),
           el('th', { style: 'text-align:right', text: 'pro Jahr' }), el('th', {}),
         ])]),
         el('tbody', {}, zeilen),
@@ -1144,7 +1257,11 @@ function kostenKarte(o, neuZeichnen, kennzahlenNeu) {
     nach(); neuZeichnen();
   };
 
+  const ohneNk = ohneVorauszahlung().filter((x) => x.o === o);
   return abschnitt('Laufende Kosten', 'Positionen mit Fälligkeit · nur der nicht umlagefähige Teil mindert den Cashflow', [
+    ohneNk.length ? hinweis(`<strong>Keine Nebenkosten-Vorauszahlung</strong> im Mietvertrag von ${ohneNk.map((x) => x.mv.mieter || 'ohne Mieter').join(', ')}. `
+      + 'Ohne sie rechnet die App keine Umlagen – die umlagefähigen Kosten stehen dann allein als Werbungskosten da, wie bei Leerstand. '
+      + 'Trag die Vorauszahlung im Mietvertrag ein, falls eine vereinbart ist.', 'warn') : null,
     sammel ? hinweis('Die <b>Sammelposten</b> stammen aus der früheren Erfassung. Teile sie anhand des Wirtschaftsplans '
       + 'in einzelne Kostenarten auf, dann zeigt die Übersicht „Nebenkosten“ sie einzeln.', 'info') : null,
     inhalt,
@@ -1152,10 +1269,17 @@ function kostenKarte(o, neuZeichnen, kennzahlenNeu) {
       el('button.btn.btn-sm', { type: 'button', onclick: () => neu('sonstigeBetrieb', o.typ === 'ETW') }, ['+ Position']),
       liste.some((x) => x.art === 'ruecklage') ? null
         : el('button.btn.btn-sm', { type: 'button', onclick: () => neu('ruecklage', true) }, ['+ Erhaltungsrücklage']),
+      o.betriebskosten.length ? el('button.btn.btn-sm', { type: 'button', onclick: () => planAbMonat(o, () => { kennzahlenNeu(); neuZeichnen(); }) }, ['Neuer Wirtschaftsplan …']) : null,
       el('a.btn.btn-sm', { href: '#/nebenkosten?objekt=' + o.id }, ['Monatsübersicht']),
+      fruehere.length ? el('button.btn.btn-sm.btn-ghost', {
+        type: 'button',
+        onclick: () => { localStorage.setItem(FRUEHERE_KEY, zeigeFruehere ? '0' : '1'); neuZeichnen(); },
+      }, [zeigeFruehere ? 'Frühere Stände ausblenden' : `Frühere Stände anzeigen (${fruehere.length})`]) : null,
     ]),
     el('div', { style: 'margin-top:14px;padding-top:6px;border-top:1px solid var(--border)' }, [summenBox]),
-    el('div.hint', { style: 'margin-top:8px', text: 'Betrag je Fälligkeit. „Hausgeld“: Teil des Hausgelds an die Gemeinschaft, wird monatlich gezahlt. '
+    el('div.hint', { style: 'margin-top:8px', text: 'Ein Betrag direkt in der Tabelle gilt für den ganzen Zeitraum der Position, also auch rückwirkend. '
+      + 'Ändert sich ein Betrag ab einem Monat, „ab …“ oder „Neuer Wirtschaftsplan“ verwenden – dann bleiben vergangene Monate und Steuerjahre unverändert.' }),
+    el('div.hint', { style: 'margin-top:4px', text: 'Betrag je Fälligkeit. „Hausgeld“: Teil des Hausgelds an die Gemeinschaft, wird monatlich gezahlt. '
       + '„umlagefähig“ gilt nur, wenn der Mietvertrag die Umlage vereinbart (§ 556 BGB, § 2 BetrKV).' }),
   ]);
 }
@@ -1200,6 +1324,17 @@ function buchungenKarte(o, neuZeichnen, kennzahlenNeu) {
           el('option', { value: '', selected: !b.verteilenJahre }, ['in einem Jahr']),
           ...[2, 3, 4, 5].map((n) => el('option', { value: String(n), selected: b.verteilenJahre === n }, [`auf ${n} Jahre (§ 82b)`])),
         ]),
+        o.typ === 'ETW' || b.ausRuecklage ? el('label', {
+          style: 'display:flex;gap:6px;align-items:center;font-size:12px;margin-top:4px;cursor:pointer',
+          title: 'Von der Gemeinschaft aus der Erhaltungsrücklage bezahlt: steuerlich jetzt abziehbar, '
+            + 'im Cashflow aber kein neuer Abfluss – das Geld ging schon mit dem Hausgeld (BFH IX R 19/24)',
+        }, [
+          el('input', {
+            type: 'checkbox', checked: !!b.ausRuecklage,
+            onchange: (e) => { aendern(() => { b.ausRuecklage = e.target.checked; }); kennzahlenNeu(); neuZeichnen(); },
+          }),
+          'aus der Rücklage bezahlt',
+        ]) : null,
       ] : []),
       el('td', { style: 'width:40px' }, [el('button.icon-mini', {
         type: 'button', title: 'Buchung löschen', html: '&times;',
@@ -1274,15 +1409,108 @@ function buchungenKarte(o, neuZeichnen, kennzahlenNeu) {
 
 /* ---------- Nebenkostenabrechnung ---------- */
 
-function nkAbrechnungKarte(o) {
-  const jahr = AKTUELLES_JAHR();
-  const zeilen = nkAbrechnungObjekt(o.id, jahr);
-  if (!zeilen.length) return null;
+const NK_JAHR_KEY = 'immo-nk-abrechnung-jahr';
+
+/** Erster Tag des übernächsten Monats – Vorgabe für eine neue Vorauszahlung. */
+function uebernaechsterMonat(heute = heuteISO()) {
+  let j = Number(heute.slice(0, 4)), m = Number(heute.slice(5, 7)) + 2;
+  if (m > 12) { m -= 12; j += 1; }
+  return `${j}-${String(m).padStart(2, '0')}-01`;
+}
+
+const mieterVon = (n) => n.vertraege.map((mv) => mv.mieter || 'ohne Mieter').join(', ');
+
+/** Ergebnis einer Abrechnung als Nachzahlung oder Erstattung buchen. */
+async function abrechnungBuchen(o, e, n, fertig) {
+  const nach = n.ergebnis >= 0;
+  const datumEingabe = el('input', { type: 'date', value: heuteISO(), style: 'max-width:180px' });
+  const ok = await modal({
+    titel: `Abrechnung ${n.jahr} buchen`,
+    beschreibung: `${einheitName(e)} · ${mieterVon(n)} · ${eur(Math.abs(n.ergebnis))} ${nach ? 'Nachzahlung des Mieters' : 'Erstattung an den Mieter'}`,
+    inhalt: el('div', {}, [
+      el('div.field', {}, [el('label', { text: 'Datum der Zahlung' }), datumEingabe]),
+      el('div.hint', { text: 'Steuerlich zählt das Jahr, in dem das Geld fließt (§ 11 EStG) – meist das Jahr nach dem Abrechnungsjahr. '
+        + 'Die Buchung steht danach in der Buchhaltung und lässt sich dort ändern.' }),
+    ]),
+    buttons: [
+      { text: 'Abbrechen', wert: false },
+      { text: 'Buchen', wert: true, klasse: 'btn-primary' },
+    ],
+  });
+  if (!ok) return;
+  aendern((d) => {
+    d.buchungen.push({ ...neueBuchung(o.id, datumEingabe.value || heuteISO()), ...abrechnungsBuchungFelder(n, mieterVon(n)) });
+  });
+  toast(`${nach ? 'Nachzahlung' : 'Erstattung'} gebucht.`, 'ok');
+  fertig();
+}
+
+/** Neue Vorauszahlung als Kondition im Mietvertrag ab einem Datum. */
+async function vorauszahlungUebernehmen(mv, v, fertig) {
+  const ab = el('input', { type: 'date', value: uebernaechsterMonat(), style: 'max-width:180px' });
+  const betrag = el('input', { type: 'text', inputmode: 'decimal', value: num(v.vorschlag, 2) });
+  const ok = await modal({
+    titel: 'Vorauszahlung anpassen',
+    beschreibung: `${mv.mieter || 'ohne Mieter'} · bisher ${eur(v.aktuell)} / Monat`,
+    inhalt: el('div', {}, [
+      el('div.field', {}, [el('label', { text: 'Neue Vorauszahlung je Monat (€)' }), betrag]),
+      el('div.field', {}, [el('label', { text: 'gilt ab' }), ab]),
+      el('div.hint', { text: 'Nach einer Abrechnung kann jede Seite die Vorauszahlung durch Erklärung in Textform auf eine '
+        + 'angemessene Höhe anpassen (§ 560 Abs. 4 BGB). Die App legt dafür eine neue Kondition im Mietvertrag an; '
+        + 'die Kaltmiete bleibt, die Sperrfrist für Mieterhöhungen läuft nicht neu.' }),
+    ]),
+    buttons: [
+      { text: 'Abbrechen', wert: false },
+      { text: 'Übernehmen', wert: true, klasse: 'btn-primary', vorAbschluss: () => !!ab.value && parseZahl(betrag.value) != null },
+    ],
+  });
+  if (!ok) return;
+  const wert = parseZahl(betrag.value), datumAb = ab.value;
+  aendern(() => {
+    mv.konditionen = mv.konditionen || [];
+    const gleich = mv.konditionen.find((k) => k.gueltigAb === datumAb);
+    if (gleich) gleich.nkVorauszahlung = wert;
+    else {
+      const basis = aktuelleKondition(mv, datumAb);
+      mv.konditionen.push({
+        id: uid('kond'), gueltigAb: datumAb, kaltmiete: basis?.kaltmiete ?? null,
+        nkVorauszahlung: wert, notiz: 'Vorauszahlung angepasst (§ 560 Abs. 4 BGB)',
+      });
+    }
+    // Spätere Stufen (Staffel) tragen die neue Vorauszahlung weiter
+    for (const k of mv.konditionen) if (k.gueltigAb > datumAb) k.nkVorauszahlung = wert;
+  });
+  toast(`Vorauszahlung ab ${datum(datumAb)}: ${eur(wert)}.`, 'ok');
+  fertig();
+}
+
+function nkAbrechnungKarte(o, neu) {
+  const einheiten = einheitenVon(o.id);
+  if (!einheiten.length) return null;
+  const aktuell = AKTUELLES_JAHR();
+  const jahre = [aktuell - 1, aktuell, aktuell - 2];
+  const gemerkt = Number(localStorage.getItem(NK_JAHR_KEY));
+  const jahr = jahre.includes(gemerkt) ? gemerkt : aktuell - 1;
+  const laufend = jahr >= aktuell;
+  const heute = heuteISO();
+  const frist = abrechnungsFrist(jahr);
+  const tageRest = Math.round((Date.parse(frist) - Date.parse(heute)) / 864e5);
+  const zeilen = nkAbrechnungObjekt(o.id, jahr).filter((n) => n.monateVermietet || n.vorauszahlung || n.kosten);
 
   const zeile = (n) => {
     const e = state.daten.einheiten.find((x) => x.id === n.einheitId);
+    const buchung = abrechnungsBuchung(e.id, jahr);
+    const zugestellt = abrechnungZugestellt(e, jahr);
+    const anteil = n.zeitanteil < 0.999 ? ` · ${n.monateVermietet} Monate vermietet` : '';
+    const aktion = laufend ? el('span.faint', { text: 'Jahr läuft noch', style: 'font-size:12px' })
+      : buchung ? el('span.badge.gruen', { text: `gebucht ${datum(buchung.datum)}` })
+        : Math.abs(n.ergebnis) < 0.005 ? el('span.faint', { text: '–' })
+          : el('button.btn.btn-sm', { type: 'button', onclick: () => abrechnungBuchen(o, e, n, neu) }, ['Buchen']);
     return el('tr', {}, [
-      el('td', { text: einheitName(e) }),
+      el('td', {}, [
+        el('div', { text: einheitName(e) }),
+        el('div.faint', { text: (mieterVon(n) || 'Leerstand') + anteil, style: 'font-size:12px' }),
+      ]),
       el('td.num', { text: eur(n.vorauszahlung, 0) }),
       el('td.num', { text: eur(n.kosten, 0) }),
       el('td.num', {
@@ -1290,21 +1518,67 @@ function nkAbrechnungKarte(o) {
         style: 'font-weight:600',
       }),
       el('td.faint', { text: n.ergebnis >= 0 ? 'Nachzahlung' : 'Erstattung', style: 'font-size:12px' }),
+      laufend ? el('td') : el('td', { style: 'width:160px' }, [el('input', {
+        type: 'date', value: zugestellt || '', title: 'Datum, an dem die Abrechnung dem Mieter zugegangen ist',
+        style: 'max-width:150px',
+        onchange: (ev) => {
+          aendern(() => { e.nkZugestellt = { ...(e.nkZugestellt || {}), [jahr]: ev.target.value || null }; });
+          neu();
+        },
+      })]),
+      el('td', { style: 'width:150px' }, [aktion]),
     ]);
   };
 
+  /* Vorschlag für die Vorauszahlung: Stand der Positionen zum Datum, ab dem
+     eine neue Vorauszahlung frühestens gälte – so zählt ein schon erfasster
+     neuer Wirtschaftsplan mit. */
+  const stand = uebernaechsterMonat(heute);
+  const vorschlaege = einheiten.map((e) => ({ e, v: vorauszahlungVorschlag(e.id, stand) })).filter((x) => x.v?.relevant);
+
+  const offen = !laufend && zeilen.some((n) => n.vorauszahlung > 0 && !abrechnungZugestellt(einheiten.find((e) => e.id === n.einheitId), jahr));
+  const fristHinweis = laufend ? null
+    : offen ? hinweis(`<strong>Frist ${datum(frist)}</strong> (noch ${tageRest} Tage): Bis dahin muss die Abrechnung ${jahr} dem Mieter zugehen, `
+        + 'sonst ist eine Nachforderung ausgeschlossen (§ 556 Abs. 3 BGB). Trag das Zustelldatum ein, wenn sie raus ist.', tageRest <= 90 ? 'warn' : 'info')
+      : null;
+
   return abschnitt(`Nebenkostenabrechnung ${jahr}`,
-    'umlagefähige Kosten nach Wohnfläche verteilt – eine Näherung, kein Ersatz für die formelle Abrechnung', [
-      el('table.data.kompakt', {}, [
+    'umlagefähige Kosten nach Wohnfläche und Mietdauer verteilt – eine Näherung, kein Ersatz für die formelle Abrechnung', [
+      el('div', { style: 'display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap' }, [
+        el('label', { text: 'Abrechnungsjahr', style: 'font-size:13px' }),
+        el('select', {
+          style: 'max-width:200px',
+          onchange: (ev) => { localStorage.setItem(NK_JAHR_KEY, ev.target.value); neu(); },
+        }, [...jahre].sort((x, y) => y - x).map((j) => el('option', { value: String(j), selected: j === jahr },
+          [j === aktuell ? `${j} (läuft, bisher)` : String(j)]))),
+      ]),
+      fristHinweis,
+      zeilen.length ? el('div.tabelle-scroll', {}, [el('table.data.kompakt.liste', {}, [
         el('thead', {}, [el('tr', {}, [
           el('th', { text: 'Einheit' }),
           el('th', { style: 'text-align:right', text: 'Vorauszahlung' }),
           el('th', { style: 'text-align:right', text: 'umlagefähige Kosten' }),
           el('th', { style: 'text-align:right', text: 'Ergebnis' }),
           el('th', {}),
+          el('th', { text: laufend ? '' : 'zugestellt am' }),
+          el('th', {}),
         ])]),
         el('tbody', {}, zeilen.map(zeile)),
-      ]),
+      ])]) : el('div.faint', { text: `Für ${jahr} gibt es nichts abzurechnen.`, style: 'font-size:13px' }),
+      vorschlaege.length ? el('div', { style: 'margin-top:14px;padding-top:10px;border-top:1px solid var(--border)' }, [
+        el('div', { text: 'Vorauszahlung passt nicht zu den Kosten', style: 'font-weight:600;font-size:14px;margin-bottom:6px' }),
+        ...vorschlaege.map(({ e, v }) => el('div', { style: 'display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:4px 0;font-size:13px' }, [
+          el('span', {}, [
+            `${einheitName(e)}: ${eur(v.aktuell, 0)} → `, el('strong', { text: eur(v.vorschlag, 0) }), ' / Monat',
+            el('span.faint', { text: ` · umlagefähige Kosten laut Positionen ${eur(v.jahreskosten, 0)} / Jahr` }),
+          ]),
+          v.mv ? el('button.btn.btn-sm', { type: 'button', onclick: () => vorauszahlungUebernehmen(v.mv, v, neu) }, ['Übernehmen …'])
+            : el('span.faint', { text: 'mehrere Verträge – im Mietvertrag anpassen', style: 'font-size:12px' }),
+        ])),
+      ]) : null,
+      el('div.hint', { style: 'margin-top:8px', text: '„Buchen“ legt das Ergebnis als Nebenkosten-Nachzahlung oder -Erstattung an; '
+        + 'beides zählt steuerlich als Umlage im Jahr der Zahlung. Ein Mieterwechsel im Jahr braucht je Mieter eine eigene Abrechnung – '
+        + 'die App rechnet je Einheit.' }),
     ]);
 }
 
