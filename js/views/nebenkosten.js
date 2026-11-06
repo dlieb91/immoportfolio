@@ -14,8 +14,8 @@ import { laufenderMonat } from '../zahlungen.js';
 const MONAT_KURZ = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
 const MONAT_LANG = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
 const GRUPPEN = [
-  { key: 'umlage', text: 'Umlagefähig', unter: 'zahlen die Mieter über die Vorauszahlung' },
-  { key: 'nichtUmlage', text: 'Nicht umlagefähig', unter: 'trägt der Vermieter · Werbungskosten' },
+  { key: 'umlage', text: 'Umlagefähig', unter: 'Werbungskosten · die Vorauszahlung der Mieter ist Einnahme' },
+  { key: 'nichtUmlage', text: 'Nicht umlagefähig', unter: 'Werbungskosten · trägt der Vermieter' },
   { key: 'ruecklage', text: 'Erhaltungsrücklage', unter: 'steuerlich erst bei Verausgabung' },
 ];
 

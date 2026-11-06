@@ -1077,8 +1077,8 @@ function kostenKarte(o, neuZeichnen, kennzahlenNeu) {
     ]);
     leeren(summenBox).append(
       zeile('Hausgeld laut Positionen', eur(hausgeldMonat) + ' / Monat', 'zum Abgleich mit dem Kontoauszug'),
-      zeile('Umlagefähig', eur(k.betriebskostenUmlagefaehig, 0) + ' / Jahr', 'zahlen die Mieter über die Vorauszahlung'),
-      zeile('Nicht umlagefähig', eur(nichtUmlage, 0) + ' / Jahr', 'Werbungskosten im Jahr der Zahlung'),
+      zeile('Umlagefähig', eur(k.betriebskostenUmlagefaehig, 0) + ' / Jahr', 'Werbungskosten · die Vorauszahlung der Mieter ist Einnahme'),
+      zeile('Nicht umlagefähig', eur(nichtUmlage, 0) + ' / Jahr', 'Werbungskosten · trägt der Vermieter'),
       zeile('Erhaltungsrücklage', k.ruecklageGesetzt ? eur(k.instandhaltung, 0) + ' / Jahr' : '–',
         k.ruecklageGesetzt ? 'steuerlich erst abziehbar, wenn die Gemeinschaft das Geld ausgibt (BFH IX R 19/24)'
           : `keine Position – der Forecast rechnet mit ${num(state.daten.einstellungen.instandhaltungProzent ?? 0, 2)} % vom Kaufpreis`),
