@@ -25,6 +25,7 @@ import {
 } from './store.js';
 import { restschuldZu, ersatzGuthabenZu, ersatzEingezahltBis } from './finanzmathematik.js';
 import { jahresSummen } from './zahlungen.js';
+import { kostenJahr } from './betriebskosten.js';
 
 /* ---------- Anzeigemodus: vor / nach Steuern ---------- */
 
@@ -305,11 +306,11 @@ export function objektKennzahlen(o, stichtag = heuteISO()) {
      Für das Kalenderjahr anteilig nach Besitzmonaten, damit ein
      Anschaffungsjahr nicht zwölf Monate Kosten gegen zehn Monate Miete
      stellt. Die Volljahreswerte bleiben Grundlage aller Renditen. */
-  const k = o.kosten || {};
-  const hausgeldVoll = Math.max(0, (k.hausgeldMonat || 0) - (k.hausgeldUmlagefaehigMonat || 0)) * 12;
-  const verwaltungVoll = (k.verwaltungMonat || 0) * 12;
-  const instandhaltungVoll = (k.instandhaltungMonat || 0) * 12;
-  const sonstigeVoll = k.sonstigeJahr || 0;
+  const k = kostenJahr(o);
+  const hausgeldVoll = k.hausgeld;
+  const verwaltungVoll = k.verwaltung;
+  const instandhaltungVoll = k.instandhaltung;
+  const sonstigeVoll = k.sonstige;
   const bewirtschaftungVoll = hausgeldVoll + verwaltungVoll + instandhaltungVoll + sonstigeVoll;
 
   const hausgeldNichtUmlagefaehig = ist.hausgeld;

@@ -14,11 +14,9 @@
    Gerechnet wird **vor Steuern**: Eine Erstattung oder Nachzahlung kommt
    irgendwann im Jahr danach und ist hier nicht vorhergesagt.
 
-   Die Grenze, die der Nutzer kennen muss: Posten, die als Zwölftel erfasst
-   sind (`sonstigeJahr`, die Erhaltungsrücklage), erscheinen auch hier als
-   Zwölftel, nicht in ihrem Fälligkeitsmonat. Wer die Grundsteuer im Februar
-   sehen will, erfasst sie als Buchung mit Datum im Februar – das ist
-   dieselbe Logik, nach der die App ohnehin das Zuflussprinzip führt.
+   Die laufenden Kosten stehen im Monat ihrer Fälligkeit, wie die Positionen
+   am Objekt sie angeben (betriebskosten.js): Positionen im Hausgeld monatlich,
+   direkt bezahlte etwa vierteljährlich oder jährlich.
 */
 
 import { state } from './store.js';

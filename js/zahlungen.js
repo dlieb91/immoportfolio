@@ -18,6 +18,7 @@
 */
 
 import { uid, heuteISO } from './util.js';
+import { monatsSummen } from './betriebskosten.js';
 import {
   state, einheitenVon, finanzierungenVon, aktiveVertraege, mieteVon,
   objekt as objektMit, einheitMit, einheitName, besitzMonate, darlehenPlan,
@@ -196,17 +197,17 @@ export function monatszahlungen(o, jahr, monat) {
 
   /* Bewirtschaftung, solange das Objekt im Bestand ist */
   if (imBestand) {
-    const k = o.kosten || {};
-    const umlagefaehig = Math.max(0, k.hausgeldUmlagefaehigMonat || 0);
-    const hausgeld = Math.max(0, (k.hausgeldMonat || 0) - umlagefaehig);
-    // Umlagefaehig heisst: der Mieter zahlt es letztlich ueber die Vorauszahlung
-    // (Art 'nebenkosten'). Steuerlich ist es trotzdem eine Werbungskostenposition –
-    // bei Leerstand ist es das sogar ohne Gegenbuchung, siehe kennzahlen.js.
-    if (umlagefaehig) zeile('betriebskostenUmlagefaehig', o.id, 'Objekt', umlagefaehig);
-    if (hausgeld) zeile('hausgeld', o.id, 'Objekt', hausgeld);
-    if (k.verwaltungMonat) zeile('verwaltung', o.id, 'Objekt', k.verwaltungMonat);
-    if (k.instandhaltungMonat) zeile('instandhaltung', o.id, 'Objekt', k.instandhaltungMonat);
-    if (k.sonstigeJahr) zeile('sonstige', o.id, 'Objekt, ein Zwölftel', k.sonstigeJahr / 12);
+    /* Je Zahlungsart die Summe der Positionen, die in diesem Monat fällig
+       sind (betriebskosten.js). bezugId bleibt das Objekt, damit Korrekturen
+       aus der Zeit der Sammelfelder weiter greifen.
+       Umlagefaehig heisst: der Mieter zahlt es letztlich ueber die Vorauszahlung
+       (Art 'nebenkosten'). Steuerlich ist es trotzdem eine Werbungskostenposition –
+       bei Leerstand ist es das sogar ohne Gegenbuchung, siehe kennzahlen.js. */
+    const summen = monatsSummen(o, monat);
+    for (const art of ['betriebskostenUmlagefaehig', 'hausgeld', 'verwaltung', 'instandhaltung', 'sonstige']) {
+      const s = summen.get(art);
+      if (s?.betrag) zeile(art, o.id, s.namen.join(', '), s.betrag);
+    }
   }
 
   /* Finanzierung aus dem Tilgungsplan */

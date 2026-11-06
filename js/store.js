@@ -8,8 +8,9 @@
 import { uid, zeitstempel, heuteISO } from './util.js';
 import { planeSpeichern } from './storage.js';
 import { tilgungsplan } from './finanzmathematik.js';
+import { ausSammelfeldern } from './betriebskosten.js';
 
-export const SCHEMA_VERSION = 14;
+export const SCHEMA_VERSION = 15;
 
 export const STANDARD_EINSTELLUNGEN = {
   // Steuern
@@ -329,6 +330,20 @@ export function migrieren(daten) {
     daten.schemaVersion = 14;
   }
 
+  if (v < 15) {
+    /* Laufende Kosten als einzelne Positionen (betriebskosten.js). Die
+       Sammelfelder werden zu monatlichen Positionen mit denselben Beträgen –
+       kein Monat und keine Summe verschiebt sich. Die Sammelposten heißen
+       ausdrücklich so, damit man sie nach dem Wirtschaftsplan aufteilt. */
+    for (const o of daten.objekte || []) {
+      if (!Array.isArray(o.betriebskosten)) {
+        o.betriebskosten = ausSammelfeldern(o.kosten, () => uid('bk'));
+      }
+      delete o.kosten;
+    }
+    daten.schemaVersion = 15;
+  }
+
   const basis = neuesPortfolio(daten.meta?.name);
   const zusammen = {
     ...basis,
@@ -433,13 +448,8 @@ export function neuesObjekt(einstellungen = STANDARD_EINSTELLUNGEN) {
     // Buchungen: null heisst, die 15-%-Grenze entscheidet.
     modernisierung: [],
     werte: [],                     // {datum, wert, quelle} – Verkehrswert-Historie
-    kosten: {
-      hausgeldMonat: null,
-      hausgeldUmlagefaehigMonat: null,
-      verwaltungMonat: null,
-      instandhaltungMonat: null,
-      sonstigeJahr: null,
-    },
+    // Laufende Kosten als einzelne Positionen, siehe betriebskosten.js
+    betriebskosten: [],
     steuersatzAbweichend: null,    // ueberschreibt den Portfolio-Steuersatz
     bilder: [],                    // {datei, titel, haupt}
     tags: [],

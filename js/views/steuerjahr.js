@@ -11,6 +11,7 @@ import {
   anlageVPortfolio, anlageVAufstellung, verteilungenOffen, werbungskostenHerleitung,
 } from '../buchhaltung.js';
 import { hinweis } from '../felder.js';
+import { kostenplan } from '../nebenkostenplan.js';
 
 let jahr = new Date().getFullYear();
 
@@ -47,6 +48,8 @@ export const steuerjahr = {
       + 'Buchung der Kategorie „Erhaltungsaufwand“.'
     ));
     inner.append(aufstellungKarte('Portfolio gesamt', portfolio));
+    const nk = nebenkostenKarte(jahr);
+    if (nk) inner.append(nk);
     for (const o of state.daten.objekte) {
       /* Jedes Objekt beginnt auf einer neuen Seite – beim Finanzamt wird
          je Objekt eine eigene Anlage V abgegeben. */
@@ -117,6 +120,47 @@ function verteilungsKarte(jahr) {
       el('div.hint', { text: 'Diese Beträge sind in den Aufstellungen oben bereits mit ihrem '
         + 'Jahresanteil enthalten. Wird ein Objekt vor Ablauf der Verteilung verkauft, ist der '
         + 'Restbetrag im Jahr des Verkaufs in einer Summe abzusetzen – das rechnet die App nicht.' }),
+    ]),
+  ]);
+}
+
+/**
+ * Die laufenden Kosten aus den Positionen am Objekt, je Kostenart: was davon
+ * im Jahr abziehbar ist. Sie stecken in der Aufstellung oben bereits unter
+ * Betriebs- und Verwaltungskosten – hier sieht man, woraus diese bestehen.
+ */
+function nebenkostenKarte(jahr) {
+  const plan = kostenplan(null, jahr, true);
+  if (!plan.positionenAnzahl || !plan.summen.gesamt) return null;
+  const gruppeText = { umlage: 'umlagefähig', nichtUmlage: 'nicht umlagefähig', ruecklage: 'Rücklage' };
+  return el('div.card', {}, [
+    el('div.card-head', {}, [el('div', {}, [
+      el('h2', { text: 'Nebenkosten laut Positionen' }),
+      el('div.sub', { text: `${jahr} · in der Aufstellung oben enthalten · ${eur(plan.summen.abziehbar, 0)} abziehbar` }),
+    ])]),
+    el('div.tabelle-scroll', {}, [el('table.data.kompakt.liste', {}, [
+      el('thead', {}, [el('tr', {}, [
+        el('th', { text: 'Kostenart' }), el('th', { text: 'Umlage' }),
+        el('th', { style: 'text-align:right', text: 'Jahr' }),
+        el('th', { style: 'text-align:right', text: 'abziehbar' }),
+      ])]),
+      el('tbody', {}, plan.zeilen.filter((z) => z.jahr).map((z) => el('tr', {}, [
+        el('td', { text: z.text }),
+        el('td', { text: gruppeText[z.gruppe] }),
+        el('td.num', { text: eur(z.jahr, 0) }),
+        el('td.num', {}, [z.abziehbar ? eur(z.jahr, 0) : el('span.badge', { text: 'nicht abziehbar' })]),
+      ]))),
+      el('tfoot', {}, [el('tr', {}, [
+        el('td', { text: 'Summe', style: 'font-weight:600' }), el('td', {}),
+        el('td.num', { text: eur(plan.summen.gesamt, 0), style: 'font-weight:600' }),
+        el('td.num', { text: eur(plan.summen.abziehbar, 0), style: 'font-weight:600' }),
+      ])]),
+    ])]),
+    el('div', { style: 'padding:12px 18px;border-top:1px solid var(--border)' }, [
+      el('div.hint', { text: 'Umlagefähige und nicht umlagefähige Kosten sind Werbungskosten im Jahr der Zahlung; '
+        + 'die Vorauszahlungen der Mieter stehen dafür bei den Einnahmen. Die Erhaltungsrücklage ist erst abziehbar, '
+        + 'wenn die Gemeinschaft das Geld ausgibt (BFH IX R 19/24). Korrekturen einzelner Monate in der Buchhaltung '
+        + 'sind in der Aufstellung berücksichtigt, in dieser Aufschlüsselung nicht.' }),
     ]),
   ]);
 }

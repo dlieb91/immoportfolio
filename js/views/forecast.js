@@ -199,8 +199,8 @@ function liquiditaetKarte() {
         : null,
       el('div.hint', { html:
         '<strong>Grenzen:</strong> Gerechnet wird vor Steuern; eine Erstattung oder Nachzahlung ist nicht vorhergesagt. '
-        + 'Kosten, die als Jahresbetrag oder als Erhaltungsrücklage erfasst sind, erscheinen als Zwölftel – '
-        + 'wer etwa die Grundsteuer im Februar sehen will, erfasst sie als <em>Buchung</em> mit Datum im Februar. '
+        + 'Die laufenden Kosten stehen im Monat ihrer Fälligkeit, so wie die Positionen am Objekt sie angeben – '
+        + 'Positionen im Hausgeld monatlich, die Grundsteuer etwa vierteljährlich. '
         + 'Eine erhaltene Kaution steht unter „Kaution &amp; Privat“, denn das Geld gehört dem Mieter.' }),
     ].filter(Boolean)),
   ]);

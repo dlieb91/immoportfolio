@@ -24,6 +24,7 @@ import { forecast } from './views/forecast.js';
 import { objektForecast } from './views/objektForecast.js';
 import { buchhaltung } from './views/buchhaltungView.js';
 import { steuerjahr } from './views/steuerjahr.js';
+import { nebenkosten } from './views/nebenkosten.js';
 
 /* ---------- Ansichten ---------- */
 
@@ -35,6 +36,7 @@ const ICONS = {
   forecast: '<path d="M3 3v18h18"/><path d="M7 15l4-5 3 3 5-7"/>',
   einzelobjekt: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/><path d="M8.5 12.5l2-2 1.5 1.5 2.5-3"/>',
   buchhaltung: '<path d="M5 3h14a1 1 0 0 1 1 1v17l-3-2-3 2-3-2-3 2-3-2V4a1 1 0 0 1 1-1z"/><path d="M8 8h8M8 12h5"/>',
+  nebenkosten: '<path d="M12 3c3 4 6 7.5 6 11a6 6 0 0 1-12 0c0-3.5 3-7 6-11z"/><path d="M9.5 14.5a2.5 2.5 0 0 0 2.5 2.5"/>',
   steuerjahr: '<path d="M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"/><path d="M15 2v5h5"/><path d="M9 15l2 2 4-4"/>',
   einstellungen: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
 };
@@ -83,11 +85,12 @@ const ANSICHTEN = {
     titel: 'Buchhaltung', view: buchhaltung,
     zaehler: (d) => d.zahlungen.length + d.buchungen.length + d.fahrten.length,
   },
+  nebenkosten: { titel: 'Nebenkosten', view: nebenkosten },
   steuerjahr: { titel: 'Steuerjahr', view: steuerjahr },
   einstellungen: { titel: 'Einstellungen', view: einstellungen },
 };
 
-const REIHENFOLGE = ['dashboard', 'objekte', 'mietvertraege', 'finanzierungen', 'buchhaltung', 'steuerjahr', 'forecast', 'einzelobjekt', 'einstellungen'];
+const REIHENFOLGE = ['dashboard', 'objekte', 'mietvertraege', 'finanzierungen', 'buchhaltung', 'nebenkosten', 'steuerjahr', 'forecast', 'einzelobjekt', 'einstellungen'];
 
 /* Leiste unten am Handy: vier Hauptziele, alles Übrige hinter „Mehr“. */
 const TABS = [['dashboard', 'Start'], ['objekte', 'Objekte'], ['buchhaltung', 'Buchhaltung'], ['forecast', 'Forecast']];

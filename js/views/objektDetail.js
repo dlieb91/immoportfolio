@@ -12,8 +12,11 @@ import { bildURL, bildSpeichern, bildLoeschen } from '../storage.js';
 import {
   textFeld, zahlFeld, zahlEingabe, datumFeld, auswahlFeld, schalterFeld, textBereich,
   anzeigeFeld, felderGitter, abschnitt, parseZahl,
-  tabellenDatum, tabellenZahl, tabellenText, tabellenAuswahl,
+  tabellenDatum, tabellenZahl, tabellenText, tabellenAuswahl, hinweis,
 } from '../felder.js';
+import {
+  KOSTENARTEN, RHYTHMEN, kostenart, artVorgabe, neuePosition, jahresbetrag, kostenJahr,
+} from '../betriebskosten.js';
 import { OBJEKTTYPEN, ENERGIEKLASSEN, typText } from './objekte.js';
 import { anlegen as mietvertragAnlegen, STATUS_TEXT, STATUS_KLASSE } from './mietvertraege.js';
 import {
@@ -72,7 +75,7 @@ export const objektDetail = {
     inner.append(steuerKarte(o, obenNeu));
     inner.append(neuZeichnend((z) => verkehrswertKarte(o, () => { z(); obenNeu(); }, obenNeu)));
     inner.append(neuZeichnend((z) => modernisierungKarte(o, () => { z(); obenNeu(); }, obenNeu)));
-    inner.append(kostenKarte(o, obenNeu));
+    inner.append(neuZeichnend((z) => kostenKarte(o, z, obenNeu)));
     inner.append(neuZeichnend((z) => buchungenKarte(o, z, obenNeu)));
     inner.append(nkBox);
     inner.append(neuZeichnend((z) => bilderKarte(o, z)));
@@ -1050,73 +1053,110 @@ function modernisierungKarte(o, neuZeichnen, obenNeu) {
 
 /* ---------- Laufende Kosten ---------- */
 
-function kostenKarte(o, kennzahlenNeu) {
-  const k = o.kosten;
+const MONATE_KURZ = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+const ARTEN_WAHL = KOSTENARTEN.map((a) => ({ wert: a.key, text: a.text }));
+const MONATE_WAHL = MONATE_KURZ.map((m, i) => ({ wert: i + 1, text: m }));
 
-  /* Abgeleitete Anzeigen werden an Ort und Stelle nachgezogen – die Karte
-     selbst bleibt stehen, sonst verliert das nächste Feld beim Klick den Fokus. */
-  const umlageWert = el('div.readonly');
-  const umlageHinweis = el('div.hint');
-  const warnung = el('div.hint', { style: 'margin-top:6px;color:var(--warn)' });
-  const summeWert = el('span.num', { style: 'font-weight:600' });
-  const instandHinweis = el('div.hint');
+/**
+ * Laufende Kosten als Positionen (betriebskosten.js). Jede Zeile: Kostenart,
+ * Bezeichnung, Betrag je Fälligkeit, Zahlweise, „im Hausgeld“, „umlagefähig“.
+ * Die Summen darunter sind dieselben, mit denen Cashflow und Steuer rechnen.
+ */
+function kostenKarte(o, neuZeichnen, kennzahlenNeu) {
+  if (!Array.isArray(o.betriebskosten)) o.betriebskosten = [];
+  const liste = o.betriebskosten;
 
-  const anzeigenNeu = () => {
-    const nichtUmlage = Math.max(0, (k.hausgeldMonat || 0) - (k.hausgeldUmlagefaehigMonat || 0));
-    const zuViel = (k.hausgeldUmlagefaehigMonat || 0) > (k.hausgeldMonat || 0);
-    const summe = (nichtUmlage + (k.verwaltungMonat || 0) + (k.instandhaltungMonat || 0)) * 12 + (k.sonstigeJahr || 0);
-    umlageWert.textContent = eur(nichtUmlage) + ' / Monat';
-    umlageWert.className = 'readonly' + (zuViel ? '' : ' betont');
-    umlageHinweis.textContent = eur(nichtUmlage * 12, 0) + ' pro Jahr';
-    warnung.textContent = zuViel
-      ? 'Der umlagefähige Anteil ist größer als das gesamte Hausgeld – bitte prüfen. Gerechnet wird mit 0 €.'
-      : '';
-    /* Der Forecast setzt bei leerem Feld die Instandhaltungspauschale aus den
-       Annahmen an (siehe forecast.js) – die Ist-Rechnung hier tut das nicht.
-       Eine ausdrückliche 0 unterscheidet sich von „leer" und wird respektiert. */
-    if (k.instandhaltungMonat != null) {
-      instandHinweis.textContent = k.instandhaltungMonat
-        ? `pro Monat · ${eur(k.instandhaltungMonat * 12, 0)} pro Jahr`
-        : 'pro Monat · 0 € pro Jahr, der Forecast setzt keine Rücklage an';
-    } else {
-      const prozent = state.daten.einstellungen.instandhaltungProzent ?? 0;
-      const pauschale = (o.kaufpreis || 0) * prozent / 100;
-      instandHinweis.textContent = `pro Monat, leer · der Forecast rechnet mit ${eur(pauschale, 0)} `
-        + `pro Jahr (${num(prozent, 2)} % vom Kaufpreis aus den Annahmen)`;
-    }
-    /* Der steuerliche Hinweis gilt unabhaengig davon, ob ein Betrag steht –
-       er erklaert, warum die Rücklage in der Anlage V nicht auftaucht. */
-    instandHinweis.textContent += ' · steuerlich erst abziehbar, wenn die Gemeinschaft '
-      + 'das Geld verausgabt (BFH IX R 19/24)';
-    summeWert.textContent = eur(summe, 0) + ' / Jahr';
+  const summenBox = el('div');
+  const summenNeu = () => {
+    const k = kostenJahr(o);
+    const nichtUmlage = k.hausgeld + k.verwaltung + k.sonstige;
+    const hausgeldMonat = liste.filter((x) => x.imHausgeld).reduce((s, x) => s + jahresbetrag(x), 0) / 12;
+    const zeile = (text, wert, unter, betont) => el('div', { style: 'display:flex;justify-content:space-between;gap:12px;padding:5px 0;font-size:13px' + (betont ? ';font-weight:600;border-top:1px solid var(--border);margin-top:4px;padding-top:9px' : '') }, [
+      el('span', {}, [text, unter ? el('span.faint', { text: ' · ' + unter }) : null]),
+      el('span.num', { text: wert }),
+    ]);
+    leeren(summenBox).append(
+      zeile('Hausgeld laut Positionen', eur(hausgeldMonat) + ' / Monat', 'zum Abgleich mit dem Kontoauszug'),
+      zeile('Umlagefähig', eur(k.betriebskostenUmlagefaehig, 0) + ' / Jahr', 'zahlen die Mieter über die Vorauszahlung'),
+      zeile('Nicht umlagefähig', eur(nichtUmlage, 0) + ' / Jahr', 'Werbungskosten im Jahr der Zahlung'),
+      zeile('Erhaltungsrücklage', k.ruecklageGesetzt ? eur(k.instandhaltung, 0) + ' / Jahr' : '–',
+        k.ruecklageGesetzt ? 'steuerlich erst abziehbar, wenn die Gemeinschaft das Geld ausgibt (BFH IX R 19/24)'
+          : `keine Position – der Forecast rechnet mit ${num(state.daten.einstellungen.instandhaltungProzent ?? 0, 2)} % vom Kaufpreis`),
+      zeile('Cashflow-wirksame Bewirtschaftungskosten', eur(nichtUmlage + k.instandhaltung, 0) + ' / Jahr', null, true),
+    );
+  };
+  summenNeu();
+
+  const nach = () => { summenNeu(); kennzahlenNeu(); };
+  const opt = { nach, umbauen: neuZeichnen };
+  const pruefen = (pos, key) => {
+    const input = el('input', {
+      type: 'checkbox', checked: !!pos[key], disabled: key === 'umlagefaehig' && pos.art === 'ruecklage',
+      onchange: (e) => { aendern(() => { pos[key] = e.target.checked; }); nach(); neuZeichnen(); },
+    });
+    return el('label', { style: 'display:flex;justify-content:center;cursor:pointer' }, [input]);
   };
 
-  const b = { bezug: o.id, nach: () => { anzeigenNeu(); kennzahlenNeu(); } };
-  anzeigenNeu();
+  const zeilen = liste.map((pos) => el('tr', {}, [
+    el('td', { style: 'min-width:190px' }, [tabellenAuswahl(pos, 'art', ARTEN_WAHL, {
+      nach: () => {
+        // Neue Kostenart: Vorgabe für umlagefähig und Zahlweise übernehmen
+        const v = artVorgabe(pos.art);
+        aendern(() => { pos.umlagefaehig = v.umlagefaehig; if (!pos.imHausgeld) { pos.rhythmus = v.rhythmus; pos.ersterMonat = v.ersterMonat; } });
+        nach();
+      },
+      umbauen: neuZeichnen,
+    })]),
+    el('td', { style: 'min-width:140px' }, [tabellenText(pos, 'bezeichnung', { platzhalter: kostenart(pos.art).text })]),
+    el('td', { style: 'width:110px' }, [tabellenZahl(pos, 'betrag', opt)]),
+    el('td', { style: 'width:155px' }, [pos.imHausgeld
+      ? el('span.faint', { text: 'monatlich', style: 'font-size:13px' })
+      : tabellenAuswahl(pos, 'rhythmus', RHYTHMEN.map((r) => ({ wert: r.wert, text: r.text })), opt)]),
+    el('td', { style: 'width:90px' }, [pos.imHausgeld || pos.rhythmus === 'monatlich'
+      ? el('span.faint', { text: '–' })
+      : tabellenAuswahl(pos, 'ersterMonat', MONATE_WAHL, opt)]),
+    el('td', { style: 'width:70px' }, [pruefen(pos, 'imHausgeld')]),
+    el('td', { style: 'width:80px' }, [pruefen(pos, 'umlagefaehig')]),
+    el('td.num', { style: 'width:100px', text: eur(jahresbetrag(pos), 0) }),
+    el('td', { style: 'width:40px' }, [el('button.icon-mini', {
+      type: 'button', title: 'Position entfernen', html: '&times;',
+      onclick: () => { aendern(() => { o.betriebskosten = o.betriebskosten.filter((x) => x !== pos); }); nach(); neuZeichnen(); },
+    })]),
+  ]));
 
-  return abschnitt('Laufende Kosten', 'nur der nicht umlagefähige Teil mindert den Cashflow', [
-    felderGitter([
-      zahlFeld('Hausgeld gesamt', k, 'hausgeldMonat', { ...b, suffix: '€', hint: 'pro Monat' }),
-      zahlFeld('davon umlagefähig', k, 'hausgeldUmlagefaehigMonat', { ...b, suffix: '€', hint: 'pro Monat, über die Nebenkosten abgerechnet' }),
-      el('div.field', {}, [
-        el('label', { text: '= nicht umlagefähig' }), umlageWert, umlageHinweis,
-      ]),
-      zahlFeld('Verwaltung', k, 'verwaltungMonat', { ...b, suffix: '€', hint: 'pro Monat' }),
-      el('div.field', {}, [
-        el('label', { text: 'Erhaltungsrücklage' }),
-        el('div.input-suffix', {}, [
-          zahlEingabe(k, 'instandhaltungMonat', { ...b, label: 'Erhaltungsrücklage' }),
-          el('span', { text: '€' }),
-        ]),
-        instandHinweis,
-      ]),
-      zahlFeld('Sonstige Kosten', k, 'sonstigeJahr', { ...b, suffix: '€', hint: 'pro Jahr' }),
+  const sammel = liste.some((x) => kostenart(x.art).sammel && x.betrag);
+  const inhalt = liste.length
+    ? el('div.tabelle-scroll', {}, [el('table.data.kompakt.liste', {}, [
+        el('thead', {}, [el('tr', {}, [
+          el('th', { text: 'Kostenart' }), el('th', { text: 'Bezeichnung' }),
+          el('th', { style: 'text-align:right', text: 'Betrag (€)' }),
+          el('th', { text: 'Zahlweise' }), el('th', { text: 'ab' }),
+          el('th', { style: 'text-align:center', text: 'Hausgeld' }),
+          el('th', { style: 'text-align:center', text: 'umlagefähig' }),
+          el('th', { style: 'text-align:right', text: 'pro Jahr' }), el('th', {}),
+        ])]),
+        el('tbody', {}, zeilen),
+      ])])
+    : el('div.faint', { text: 'Noch keine Kosten erfasst.', style: 'font-size:13px' });
+
+  const neu = (art, imHausgeld) => {
+    aendern(() => { o.betriebskosten = [...o.betriebskosten, neuePosition(uid('bk'), art, imHausgeld)]; });
+    nach(); neuZeichnen();
+  };
+
+  return abschnitt('Laufende Kosten', 'Positionen mit Fälligkeit · nur der nicht umlagefähige Teil mindert den Cashflow', [
+    sammel ? hinweis('Die <b>Sammelposten</b> stammen aus der früheren Erfassung. Teile sie anhand des Wirtschaftsplans '
+      + 'in einzelne Kostenarten auf, dann zeigt die Übersicht „Nebenkosten“ sie einzeln.', 'info') : null,
+    inhalt,
+    el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;margin-top:12px' }, [
+      el('button.btn.btn-sm', { type: 'button', onclick: () => neu('sonstigeBetrieb', o.typ === 'ETW') }, ['+ Position']),
+      liste.some((x) => x.art === 'ruecklage') ? null
+        : el('button.btn.btn-sm', { type: 'button', onclick: () => neu('ruecklage', true) }, ['+ Erhaltungsrücklage']),
+      el('a.btn.btn-sm', { href: '#/nebenkosten?objekt=' + o.id }, ['Monatsübersicht']),
     ]),
-    warnung,
-    el('div', { style: 'margin-top:12px;padding-top:12px;border-top:1px solid var(--border);display:flex;justify-content:space-between;font-size:13px' }, [
-      el('span', { text: 'Cashflow-wirksame Bewirtschaftungskosten', style: 'color:var(--text-faint)' }),
-      summeWert,
-    ]),
+    el('div', { style: 'margin-top:14px;padding-top:6px;border-top:1px solid var(--border)' }, [summenBox]),
+    el('div.hint', { style: 'margin-top:8px', text: 'Betrag je Fälligkeit. „Hausgeld“: Teil des Hausgelds an die Gemeinschaft, wird monatlich gezahlt. '
+      + '„umlagefähig“ gilt nur, wenn der Mietvertrag die Umlage vereinbart (§ 556 BGB, § 2 BetrKV).' }),
   ]);
 }
 

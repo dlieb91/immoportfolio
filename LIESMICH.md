@@ -294,6 +294,7 @@ werden bewusst nicht verglichen; die laufen auf zwei Geräten ohnehin auseinande
 | 24 | iPad im Vollbild: Kopfzeile nicht mehr unter der Statusleiste | fertig |
 | 25 | Handy: Leiste unten, einklappbare Karten, Buchhaltung mit Fenster von unten | fertig |
 | 26 | Eingesetztes Eigenkapital einschließlich Sanierung | fertig |
+| 27 | Nebenkosten: Positionen mit Fälligkeit, Monatsübersicht, umlagefähig und Rücklage | fertig |
 
 ## Aufbau des Codes
 
@@ -461,9 +462,8 @@ separaten **Nebenkosten-Saldo** (vereinnahmte Vorauszahlung minus umlagefähige 
 Kachel in der Objektansicht). Steuerlich zählen jedoch beide Seiten: die Vorauszahlung als
 Einnahme, die umlagefähigen Kosten als Werbungskosten. Bei Vollvermietung gleicht sich das
 nahezu aus – bei **Leerstand** nicht: Dann trägt der Vermieter die umlagefähigen Kosten
-selbst und kann sie absetzen, was die App erst seit der Buchhaltung korrekt abbildet. Vom
-Hausgeld wird für den Cashflow nach wie vor nur der nicht umlagefähige Teil angesetzt
-(Hausgeld − umlagefähig); der Betrag steht als eigene Zeile in den laufenden Kosten.
+selbst und kann sie absetzen, was die App erst seit der Buchhaltung korrekt abbildet. Für den
+Cashflow zählen nur die nicht umlagefähigen Positionen der laufenden Kosten und die Rücklage.
 Soli und Kirchensteuer werden auf die Einkommensteuer aufgeschlagen, nicht auf das Einkommen.
 
 **Geflossen oder gerechnet.** Zwei Betrachtungen stehen nebeneinander, und sie beantworten
@@ -530,10 +530,9 @@ Kontostand nicht kennt, beginnt der kumulierte Stand bei null; aussagekräftig i
 den Bedarf in einer Zeile.
 
 Zwei Grenzen, die man kennen muss. **Vor Steuern:** Eine Erstattung oder Nachzahlung ist nicht
-vorhergesagt. **Zwölftel bleiben Zwölftel:** Was als Jahresbetrag oder als Erhaltungsrücklage
-erfasst ist, erscheint gleichmäßig verteilt, nicht im Fälligkeitsmonat. Wer die Grundsteuer im
-Februar sehen will, erfasst sie als **Buchung** mit Datum im Februar – dieselbe Logik, nach der
-die App das Zuflussprinzip führt. Eine erhaltene Kaution steht in einer eigenen Zeile *Kaution &
+vorhergesagt. **Fälligkeit aus den Positionen:** Die laufenden Kosten
+stehen in dem Monat, den die Position am Objekt angibt – Hausgeld monatlich, die Grundsteuer
+etwa vierteljährlich, die Versicherung einmal im Jahr. Eine erhaltene Kaution steht in einer eigenen Zeile *Kaution &
 Privat*, denn das Geld gehört dem Mieter.
 
 **Forecast.** Die Annahmen stehen direkt über den Diagrammen und werden im Portfolio
@@ -654,6 +653,32 @@ Einheit und laufendem Jahr Vorauszahlung, anteilige umlagefähige Kosten (nach W
 verteilt) und das Ergebnis als Nachzahlung oder Erstattung. Eine Näherung fürs laufende Jahr,
 kein Ersatz für die formelle, rechtssichere Abrechnung.
 
+**Nebenkosten.** Die laufenden Kosten eines Objekts werden als **Positionen** erfasst
+(Karte *Laufende Kosten*): Kostenart nach § 2 BetrKV oder nicht umlagefähig (Verwaltung,
+Erhaltungsrücklage, Bankgebühren …), Betrag **je Fälligkeit**, Zahlweise (monatlich,
+vierteljährlich, halbjährlich, jährlich) mit erstem Fälligkeitsmonat, dazu zwei Haken:
+*Hausgeld* – Teil des Hausgelds an die Gemeinschaft, immer monatlich gezahlt – und
+*umlagefähig*, vorbelegt aus der Kostenart. Umlagefähig ist eine Position nur, wenn der
+Mietvertrag die Umlage vereinbart; die Rücklage ist es nie. Die früheren Sammelfelder wurden
+beim Update zu *Sammelposten* mit denselben Beträgen – teile sie anhand des Wirtschaftsplans
+auf, dann erscheinen die Kostenarten einzeln.
+
+Der Menüpunkt *Nebenkosten* zeigt je Objekt oder fürs Portfolio eine Tabelle über zwölf
+Monate: jede Position im Monat ihrer Fälligkeit, getrennt nach umlagefähig, nicht umlagefähig
+und Erhaltungsrücklage, darunter Gesamt, der Anteil über das Hausgeld, die Vorauszahlungen der
+Mieter und die **Deckung** (Vorauszahlung minus umlagefähige Kosten – negativ heißt
+voraussichtliche Nachzahlung). Am Handy blättert man Monat für Monat.
+
+Steuerlich zählt jede Position über ihre Zahlungsart: umlagefähige und nicht umlagefähige
+Kosten sind Werbungskosten im Jahr der Zahlung (Betriebs- bzw. Verwaltungskosten), die
+Rücklage nicht (siehe unten). Das Steuerjahr zeigt dazu die Karte *Nebenkosten laut
+Positionen*, und die Herleitung nennt bei jeder Monatszeile die enthaltenen Positionen.
+
+Grenzen: Die Übersicht zeigt den **Plan** – Korrekturen einzelner Monate in der Buchhaltung
+ändern Buchhaltung und Steuer, nicht diese Tabelle. Wer Grundsteuer oder Versicherung zusätzlich
+als Buchung erfasst, zählt sie doppelt; die Übersicht weist darauf hin. Die Excel-Mappe kennt
+nur Sammelbeträge.
+
 **Steuerjahr.** Eigener Menüpunkt mit einer Aufstellung der Einnahmen und Werbungskosten in
 der Gliederung der Anlage V – je Objekt und fürs ganze Portfolio, exportierbar als CSV.
 **Die Erhaltungsrücklage ist kein Werbungskostenabzug.** Einzahlungen in die Rücklage
@@ -663,7 +688,7 @@ verausgabt (BFH, Urteil vom 14.01.2025, IX R 19/24). Der Grund ist einleuchtend:
 sich gar nicht beurteilen, ob daraus sofort abziehbarer Erhaltungsaufwand oder nur über die
 AfA wirkender Herstellungsaufwand wird.
 
-Die App trennt das deshalb sauber: Das Feld *Erhaltungsrücklage* am Objekt fließt in den
+Die App trennt das deshalb sauber: Die Position *Erhaltungsrücklage* am Objekt fließt in den
 Cashflow, bleibt aber aus Anlage V, Einkünften und Steuer heraus – in der Ist-Rechnung, in
 der Runrate und im Forecast gleichermaßen. **Sobald die Gemeinschaft das Geld ausgibt**,
 erfasst du den Betrag als Buchung der Kategorie *Erhaltungsaufwand*; dann greift er, mit

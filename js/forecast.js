@@ -25,6 +25,7 @@ import {
   tilgungsplan, restschuldZu, ersatzGuthabenZu, ersatzEingezahltBis,
 } from './finanzmathematik.js';
 import { afaImJahr, afaWerte, eingesetztesKapital } from './kennzahlen.js';
+import { kostenJahr } from './betriebskosten.js';
 
 export const SZENARIEN = [
   { id: 'pessimistisch', name: 'Pessimistisch' },
@@ -176,13 +177,12 @@ export function prognose(params, stichtag = heuteISO(), objektIds = null) {
       /* --- Kosten ---
          Im Anschaffungsjahr nur für die Besitzmonate, damit nicht zwölf
          Monate Kosten gegen ein Rumpfjahr an Miete stehen. */
-      const k = o.kosten || {};
-      const laufend = (Math.max(0, (k.hausgeldMonat || 0) - (k.hausgeldUmlagefaehigMonat || 0)) + (k.verwaltungMonat || 0)) * 12
-        + (k.sonstigeJahr || 0);
-      /* Eine ausdrueckliche 0 heisst „keine Ruecklage ansetzen" und ist etwas
-         anderes als ein leeres Feld, das die Pauschale aus den Annahmen zieht. */
-      const instandBasis = k.instandhaltungMonat != null
-        ? k.instandhaltungMonat * 12
+      const k = kostenJahr(o);
+      const laufend = k.hausgeld + k.verwaltung + k.sonstige;
+      /* Eine Rücklage-Position mit 0 € heisst „keine Ruecklage ansetzen" und
+         ist etwas anderes als gar keine Position, dann gilt die Pauschale. */
+      const instandBasis = k.ruecklageGesetzt
+        ? k.instandhaltung
         : ((o.kaufpreis || 0) * (params.instandhaltungProzent || 0) / 100);
       const teuerung = wachstum(params.inflation, t);
       const anteil = besitzMonate(o, jahr) / 12;

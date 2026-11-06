@@ -405,10 +405,12 @@ export function werbungskostenHerleitung(o, jahr) {
     const gleich = betraege.every((b) => Math.abs(b - betraege[0]) < 0.005);
     const summe = betraege.reduce((s, b) => s + b, 0);
     if (gleich && !zeilen.some((z) => z.korrigiert)) {
-      // Regelfall: zwölf gleiche Monate – eine Zeile genügt.
+      // Regelfall: zwölf gleiche Monate – eine Zeile genügt. Die Namen
+      // sagen, was dahintersteht (bei Kosten: die Positionen am Objekt).
+      const namen = [...new Set(zeilen.map((z) => z.text).filter(Boolean))].join(', ');
       dazu(art, {
         text: `${zeilen.length} × ${betraege[0].toFixed(2).replace('.', ',')} €`,
-        zusatz: monatsSpanne(zeilen),
+        zusatz: [namen, monatsSpanne(zeilen)].filter(Boolean).join(' · '),
         betrag: summe,
       });
     } else {
