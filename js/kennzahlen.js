@@ -75,6 +75,20 @@ export function effektiverSteuersatz(o) {
  * steht: Wuerde die Pruefung afaWerte() aufrufen, das seinerseits die
  * Pruefung braucht, drehte sich die Rechnung im Kreis.
  */
+/**
+ * Grundstücksanteil in % des Kaufpreises. Ist die Aufteilung als fester
+ * Betrag erfasst (grundstueckBetrag), gilt dieser – ein Kaufpreis, der sich
+ * danach ändert, verschiebt dann den Prozentsatz, nicht den Betrag.
+ * Die Kaufnebenkosten folgen demselben Verhältnis.
+ */
+export function grundstuecksquote(o) {
+  const kp = o?.kaufpreis || 0;
+  if (o?.grundstueckBetrag != null && kp > 0) {
+    return Math.min(100, Math.max(0, (o.grundstueckBetrag / kp) * 100));
+  }
+  return o?.grundstuecksanteil ?? 0;
+}
+
 export function gebaeudeAnschaffung(o) {
   const anschaffung = nebenkostenBerechnen(o).gesamt;
   const gebaeudeVorgabe = o.gebaeudeanteilManuell != null
@@ -82,7 +96,7 @@ export function gebaeudeAnschaffung(o) {
     : null;
   const grundstueck = gebaeudeVorgabe != null
     ? anschaffung - gebaeudeVorgabe
-    : anschaffung * ((o.grundstuecksanteil ?? 0) / 100);
+    : anschaffung * (grundstuecksquote(o) / 100);
   return { anschaffung, grundstueck, gebaeude: Math.max(0, anschaffung - grundstueck) };
 }
 

@@ -296,6 +296,7 @@ werden bewusst nicht verglichen; die laufen auf zwei Geräten ohnehin auseinande
 | 26 | Eingesetztes Eigenkapital einschließlich Sanierung | fertig |
 | 27 | Nebenkosten: Positionen mit Fälligkeit, Monatsübersicht, umlagefähig und Rücklage | fertig |
 | 28 | Nebenkosten: Gültigkeit ab/bis, Abrechnung buchen, Frist, Vorauszahlung anpassen, Rücklage-Entnahme | fertig |
+| 29 | Aufteilung des Kaufpreises in Gebäude und Grundstück, als Betrag oder in % | fertig |
 
 ## Aufbau des Codes
 
@@ -509,11 +510,16 @@ Cashflow-Spalten zeigen ein Kalenderjahr, die Rendite ein volles Betriebsjahr. I
 Anschaffungsjahr liegen die beiden weit auseinander – an den Kacheln steht die jeweilige
 Grundlage dran.
 
-**Abschreibung.** Der Grundstücksanteil wird auf die **Anschaffungskosten inkl.
-Nebenkosten** angewendet; die Kaufnebenkosten werden damit im selben Verhältnis wie der
-Kaufpreis auf Grundstück und Gebäude aufgeteilt. Liegt ein Kaufpreisaufteilungsgutachten
-vor, das den Gebäudewert als festen Betrag statt als Prozentsatz ausweist, trägst du ihn
-stattdessen unter „Gebäudeanteil, manuell" ein – er ersetzt dann den Grundstücksanteil.
+**Abschreibung.** Den Kaufpreis teilst du in der Karte *Kauf & Kaufnebenkosten* unter
+**Aufteilung des Kaufpreises** auf Gebäude und Grundstück auf – wahlweise als Betrag oder
+in Prozent. Ein Feld eingeben genügt, die drei anderen rechnen sich aus (Kaufpreis 100.000 €,
+Gebäude 80.000 € → Grundstück 20.000 €, 80 % / 20 %). Was zuletzt eingegeben wurde, ist fest:
+Ein Betrag bleibt bei einer späteren Änderung des Kaufpreises gleich, ein Prozentsatz wandert
+mit. Der so ermittelte Grundstücksanteil wird auf die **Anschaffungskosten inkl. Nebenkosten**
+angewendet; die Kaufnebenkosten werden damit im selben Verhältnis wie der Kaufpreis
+aufgeteilt. Die steuerlichen Angaben zeigen den Anteil nur noch an. Weist ein Gutachten den
+Gebäudewert dagegen bereits **einschließlich** Nebenkosten aus, trägst du ihn unter
+„Gebäudeanteil, manuell" ein – er ersetzt dann die Aufteilung.
 Im Anschaffungsjahr wird die AfA ab dem Kaufmonat zeitanteilig angesetzt. Der AfA-Satz ist
 frei eingebbar – für ein Restnutzungsdauer-Gutachten trägst du z. B. 3,226 % ein (31 Jahre).
 

@@ -442,6 +442,10 @@ export function neuesObjekt(einstellungen = STANDARD_EINSTELLUNGEN) {
       weitere: [],                 // {id, bezeichnung, modus, wert}
     },
     grundstuecksanteil: 20,        // % der Anschaffungskosten, nicht abschreibbar
+    /* Fester Grundstücksanteil am Kaufpreis in €. Gesetzt, wenn die Aufteilung
+       als Betrag eingegeben wurde; dann wird grundstuecksanteil daraus
+       nachgeführt (kennzahlen.js:grundstuecksquote). Leer = der Prozentsatz gilt. */
+    grundstueckBetrag: null,
     gebaeudeanteilManuell: null,   // € · leer = aus grundstuecksanteil abgeleitet
     afaSatz: 2,                    // % p.a.
     // {id, datum, betrag, bezeichnung, aktiviert} – aktiviert wie bei den

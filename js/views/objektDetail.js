@@ -24,7 +24,7 @@ import {
   anlegen as darlehenAnlegen, artText, finanzierungKennzahlen, balken,
 } from './finanzierungen.js';
 import {
-  afaWerte, objektKennzahlen, steuerModus, effektiverSteuersatz, kapitalbindung,
+  afaWerte, objektKennzahlen, steuerModus, effektiverSteuersatz, kapitalbindung, grundstuecksquote,
 } from '../kennzahlen.js';
 import {
   KATEGORIEN, nkAbrechnungObjekt, erhaltungsAmpel, fahrtBetrag, spekulationsfrist, anschaffungsnahePruefung,
@@ -77,8 +77,10 @@ export const objektDetail = {
     inner.append(neuZeichnend((z) => einheitenKarte(o, z)));
     inner.append(neuZeichnend((z) => mietvertraegeKarte(o, z)));
     inner.append(neuZeichnend((z) => finanzierungenKarte(o, z)));
-    inner.append(neuZeichnend((z) => kaufKarte(o, () => { z(); obenNeu(); }, obenNeu)));
-    inner.append(steuerKarte(o, obenNeu));
+    let steuerNeu = () => {};
+    const kaufGeaendert = () => { obenNeu(); steuerNeu(); };
+    inner.append(neuZeichnend((z) => kaufKarte(o, () => { z(); kaufGeaendert(); }, kaufGeaendert)));
+    inner.append(neuZeichnend((z) => { steuerNeu = z; return steuerKarte(o, obenNeu); }));
     inner.append(neuZeichnend((z) => verkehrswertKarte(o, () => { z(); obenNeu(); }, obenNeu)));
     inner.append(neuZeichnend((z) => modernisierungKarte(o, () => { z(); obenNeu(); }, obenNeu)));
     inner.append(neuZeichnend((z) => kostenKarte(o, z, obenNeu)));
@@ -729,8 +731,91 @@ function nkZeile(o, label, pos, { umbauen, werteNeu, betraege, entfernen, bezeic
   ]);
 }
 
+/**
+ * Aufteilung des Kaufpreises in Gebäude und Grundstück – je als Betrag oder
+ * Prozentsatz. Was zuletzt eingegeben wurde, ist fest: ein Betrag bleibt bei
+ * einer Kaufpreisänderung gleich (grundstueckBetrag), ein Prozentsatz wandert
+ * mit (grundstuecksanteil). Die drei übrigen Felder werden berechnet.
+ */
+function aufteilungBlock(o, geaendert) {
+  const zeigen = (v, nk) => (v == null || !Number.isFinite(v) ? '' : num(v, nk));
+  const eingabe = () => el('input', { type: 'text', inputmode: 'decimal', style: 'text-align:right' });
+  const gebEur = eingabe(), gebPro = eingabe(), grdEur = eingabe(), grdPro = eingabe();
+  const status = el('span.badge', { style: 'margin-left:8px' });
+  const warnung = el('div.hint', { style: 'margin-top:6px;color:var(--warn)' });
+
+  const neu = () => {
+    const kp = o.kaufpreis || 0;
+    const quote = grundstuecksquote(o);
+    const grd = o.grundstueckBetrag != null ? Math.min(o.grundstueckBetrag, kp || o.grundstueckBetrag) : kp * quote / 100;
+    gebEur.value = kp ? zeigen(kp - grd, 2) : '';
+    grdEur.value = kp ? zeigen(grd, 2) : '';
+    gebPro.value = zeigen(100 - quote, 2);
+    grdPro.value = zeigen(quote, 2);
+    gebEur.disabled = grdEur.disabled = !kp;
+    status.textContent = o.grundstueckBetrag != null ? 'fest als Betrag' : 'fest in %';
+    warnung.textContent = o.gebaeudeanteilManuell != null
+      ? 'In den steuerlichen Angaben ist ein manueller Gebäudeanteil gesetzt – für die AfA gilt dieser, nicht diese Aufteilung.'
+      : (o.grundstueckBetrag != null && kp && o.grundstueckBetrag > kp ? 'Der Grundstücksanteil ist größer als der Kaufpreis.' : '');
+  };
+
+  const setzen = (feld, wert) => {
+    const kp = o.kaufpreis || 0;
+    if (wert == null) { neu(); return; }
+    aendern(() => {
+      if (feld === 'gebEur' || feld === 'grdEur') {
+        const grd = feld === 'grdEur' ? wert : kp - wert;
+        o.grundstueckBetrag = Math.round(Math.min(kp, Math.max(0, grd)) * 100) / 100;
+        o.grundstuecksanteil = kp ? (o.grundstueckBetrag / kp) * 100 : o.grundstuecksanteil;
+      } else {
+        const anteil = feld === 'grdPro' ? wert : 100 - wert;
+        o.grundstuecksanteil = Math.min(100, Math.max(0, anteil));
+        o.grundstueckBetrag = null;
+      }
+    });
+    neu();
+    geaendert();
+  };
+  for (const [feld, input] of [['gebEur', gebEur], ['gebPro', gebPro], ['grdEur', grdEur], ['grdPro', grdPro]]) {
+    input.addEventListener('change', (e) => setzen(feld, parseZahl(e.target.value)));
+  }
+
+  /** Nach einer Kaufpreisänderung: Prozentsatz zum festen Betrag nachführen. */
+  const kaufpreisGeaendert = () => {
+    if (o.grundstueckBetrag != null && o.kaufpreis) {
+      aendern(() => { o.grundstuecksanteil = grundstuecksquote(o); });
+    }
+    neu();
+  };
+
+  const zelle = (input) => el('td', { style: 'width:170px' }, [input]);
+  neu();
+  const knoten = el('div', { style: 'margin-top:16px;padding-top:12px;border-top:1px solid var(--border)' }, [
+    el('div', { style: 'font-weight:600;font-size:14px;margin-bottom:6px;display:flex;align-items:center;flex-wrap:wrap' }, [
+      'Aufteilung des Kaufpreises', status,
+    ]),
+    el('div.tabelle-scroll', {}, [el('table.data.kompakt', {}, [
+      el('thead', {}, [el('tr', {}, [
+        el('th', { text: '' }),
+        el('th', { style: 'text-align:right', text: 'Betrag (€)' }),
+        el('th', { style: 'text-align:right', text: 'Anteil (%)' }),
+      ])]),
+      el('tbody', {}, [
+        el('tr', {}, [el('td', { text: 'Gebäude' }), zelle(gebEur), zelle(gebPro)]),
+        el('tr', {}, [el('td', { text: 'Grundstück' }), zelle(grdEur), zelle(grdPro)]),
+      ]),
+    ])]),
+    warnung,
+    el('div.hint', { style: 'margin-top:6px', text: 'Ein Feld eingeben, die anderen rechnen sich aus. Ein Betrag bleibt fest, wenn sich der '
+      + 'Kaufpreis ändert, ein Prozentsatz wandert mit. Die Kaufnebenkosten werden im selben Verhältnis aufgeteilt – '
+      + 'daraus ergibt sich die AfA-Bemessungsgrundlage.' }),
+  ]);
+  return { knoten, kaufpreisGeaendert };
+}
+
 function kaufKarte(o, umbauen, obenNeu) {
   const nk = o.nebenkosten;
+  const aufteilung = aufteilungBlock(o, obenNeu);
 
   /* Beträge und Fußzeile werden nachgezogen, ohne die Karte neu zu bauen */
   const betraege = [];
@@ -803,7 +888,7 @@ function kaufKarte(o, umbauen, obenNeu) {
   return abschnitt('Kauf & Kaufnebenkosten', 'jede Position wahlweise in % vom Kaufpreis oder als fester Betrag', [
     felderGitter([
       datumFeld('Kaufdatum', o, 'kaufdatum', { nach: obenNeu }),
-      zahlFeld('Kaufpreis', o, 'kaufpreis', { suffix: '€', nach: werteNeu }),
+      zahlFeld('Kaufpreis', o, 'kaufpreis', { suffix: '€', nach: () => { aufteilung.kaufpreisGeaendert(); werteNeu(); } }),
       zahlFeld('Eigenprovision', o, 'eigenprovision', {
         suffix: '€', nach: werteNeu,
         hint: 'mindert die Anschaffungskosten, nicht die Kaufnebenkosten',
@@ -818,6 +903,7 @@ function kaufKarte(o, umbauen, obenNeu) {
         umbauen();
       },
     }, ['+ Weitere Position']),
+    aufteilung.knoten,
   ]);
 }
 
@@ -847,7 +933,7 @@ function steuerKarte(o, obenNeu) {
     grundstueck.wert.textContent = eur(a.grundstueck);
     grundstueck.hint.textContent = manuell
       ? 'Anschaffungskosten − manueller Gebäudeanteil'
-      : `${num(o.grundstuecksanteil ?? 0, 1)} % der Anschaffungskosten`;
+      : `${num(grundstuecksquote(o), 2)} % der Anschaffungskosten`;
     bemessung.wert.textContent = eur(a.gebaeude);
     bemessung.hint.textContent = [manuell ? 'manueller Gebäudeanteil' : 'Gebäude + Nebenkosten',
       a.modernisierung ? 'inkl. aktivierter Modernisierung' : null].filter(Boolean).join(' ');
@@ -887,11 +973,10 @@ function fristZeile(o) {
 
   return abschnitt('Steuerliche Angaben', 'Grundlage für Abschreibung und Nachsteuer-Rechnung', [
     felderGitter([
-      zahlFeld('Grundstücksanteil', o, 'grundstuecksanteil', {
-        suffix: '%', nachkomma: 1, nach,
+      anzeigeFeld('Grundstücksanteil', `${num(grundstuecksquote(o), 2)} %`, {
         hint: o.gebaeudeanteilManuell != null
           ? 'wird durch den manuellen Gebäudeanteil ersetzt'
-          : 'von den Anschaffungskosten inkl. Nebenkosten',
+          : 'aus der Aufteilung in „Kauf & Kaufnebenkosten“ · gilt auch für die Nebenkosten',
       }),
       zahlFeld('Gebäudeanteil, manuell', o, 'gebaeudeanteilManuell', {
         suffix: '€', nach,
