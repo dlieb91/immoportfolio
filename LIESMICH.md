@@ -298,6 +298,7 @@ werden bewusst nicht verglichen; die laufen auf zwei Geräten ohnehin auseinande
 | 28 | Nebenkosten: Gültigkeit ab/bis, Abrechnung buchen, Frist, Vorauszahlung anpassen, Rücklage-Entnahme | fertig |
 | 29 | Aufteilung des Kaufpreises in Gebäude und Grundstück, als Betrag oder in % | fertig |
 | 30 | Anschaffungskosten: Grundschuld sofort abziehbar, Inventar mit eigener AfA, Rücklagenanteil ohne AfA | fertig |
+| 31 | Eigenprovision mindert den steuerlichen Kaufpreis, nicht die Kaufnebenkosten | fertig |
 
 ## Aufbau des Codes
 
@@ -531,6 +532,11 @@ Was wohin gehört (H 7.3 EStH, § 9 und § 11 EStG):
 | Mitgekauftes Inventar, z. B. Einbauküche, im Vertrag gesondert ausgewiesen | eigene AfA, üblich 10 Jahre (BFH IX R 14/15) | Zeile Inventar, Nutzungsdauer wählbar |
 | Übernommener Anteil an der Erhaltungsrücklage | keine Anschaffungskosten, keine AfA | Zeile Anteil Erhaltungsrücklage |
 | Notar und Grundbuch für die **Grundschuld** (Finanzierung) | sofort abziehbare Werbungskosten im Kaufjahr | Position mit Haken *sofort abziehbar*, Knopf „+ Grundschuld“ |
+
+Eine **Eigenprovision** (Provision, die du als Käufer vom Vermittler zurückerhältst) mindert
+den **Kaufpreis** und damit Anschaffungskosten und AfA, nicht aber die Kaufnebenkosten: Die
+werden weiter vom beurkundeten Kaufpreis berechnet. Die Aufteilung in Gebäude und Grundstück
+bezieht sich auf den so geminderten, steuerlichen Kaufpreis.
 
 Die Nebenkosten werden im Verhältnis der Kaufpreisanteile auf Gebäude, Grundstück und
 Inventar verteilt; der Rücklagenanteil bekommt keinen Anteil. Das ist eine Vereinfachung: Auf

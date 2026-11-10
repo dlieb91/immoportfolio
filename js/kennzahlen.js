@@ -90,11 +90,15 @@ export function effektiverSteuersatz(o) {
  *   Anschaffungskosten (H 7.3 EStH, BFH) – eine Geldforderung, keine AfA.
  * - **Inventar** (z. B. Einbauküche) ist ein eigenes Wirtschaftsgut mit
  *   eigener AfA, üblich 10 Jahre (BFH IX R 14/15).
+ * - Eine **Eigenprovision** (Provision, die der Käufer vom Vermittler
+ *   zurückerhält) mindert den **Kaufpreis** und damit die Anschaffungs-
+ *   kosten, nicht aber die Kaufnebenkosten – die bleiben auf den
+ *   beurkundeten Kaufpreis berechnet. Sie verteilt sich auf Immobilie und
+ *   Inventar, nicht auf den Rücklagenanteil.
  * - **Aktivierungspflichtige Nebenkosten** (Grunderwerbsteuer, Notar und
  *   Grundbuch für Kauf und Eigentum, Makler) werden auf Immobilie und
- *   Inventar im Verhältnis der Kaufpreisanteile verteilt; eine
- *   Eigenprovision mindert sie. Sofort abziehbare Positionen
- *   (Geldbeschaffung) bleiben außen vor – siehe sofortAbziehbar().
+ *   Inventar im Verhältnis der Kaufpreisanteile verteilt. Sofort abziehbare
+ *   Positionen (Geldbeschaffung) bleiben außen vor – siehe sofortAbziehbar().
  *
  * Ohne Inventar, Rücklagenanteil und sofort abziehbare Positionen ist
  * `immobilie` genau Kaufpreis + Nebenkosten − Eigenprovision, wie bisher.
@@ -104,15 +108,19 @@ export function anschaffungsAufteilung(o) {
   const kp = o?.kaufpreis || 0;
   const inventar = Math.min(kp, Math.max(0, o?.inventar || 0));
   const ruecklage = Math.min(kp - inventar, Math.max(0, o?.ruecklageAnteil || 0));
-  const kaufpreisImmobilie = kp - inventar - ruecklage;
   const verteilbasis = kp - ruecklage;
-  const nebenkostenAktiv = nk.summe - nk.sofort - nk.eigenprovision;
-  const anteilImmobilie = verteilbasis > 0 ? kaufpreisImmobilie / verteilbasis : 1;
+  const anteilImmobilie = verteilbasis > 0 ? (kp - inventar - ruecklage) / verteilbasis : 1;
+  const eigenprovision = Math.min(verteilbasis, Math.max(0, nk.eigenprovision || 0));
+  // Steuerlicher Kaufpreis: beurkundet abzüglich Eigenprovision, anteilig
+  const kaufpreisImmobilie = kp - inventar - ruecklage - eigenprovision * anteilImmobilie;
+  const kaufpreisInventar = inventar - eigenprovision * (1 - anteilImmobilie);
+  const nebenkostenAktiv = nk.summe - nk.sofort;
   return {
-    kaufpreis: kp, kaufpreisImmobilie, inventar, ruecklage,
+    kaufpreis: kp, kaufpreisSteuer: kp - eigenprovision, eigenprovision,
+    kaufpreisImmobilie, inventar, ruecklage,
     nebenkostenAktiv, sofort: nk.sofort,
     immobilie: Math.max(0, kaufpreisImmobilie + nebenkostenAktiv * anteilImmobilie),
-    inventarAnschaffung: inventar ? Math.max(0, inventar + nebenkostenAktiv * (1 - anteilImmobilie)) : 0,
+    inventarAnschaffung: inventar ? Math.max(0, kaufpreisInventar + nebenkostenAktiv * (1 - anteilImmobilie)) : 0,
   };
 }
 

@@ -760,6 +760,10 @@ function aufteilungBlock(o, geaendert) {
   const invEur = eingabe('0,00'), invJahre = eingabe('10'), rlEur = eingabe('0,00');
   const ak = { geb: el('td.num'), grd: el('td.num'), inv: el('td.num'), rl: el('td.num.faint'), summe: el('td.num', { style: 'font-weight:600' }) };
   const kpZelle = el('td.num', { style: 'font-weight:600' });
+  const epZelle = el('td.num');
+  const epUnter = el('div.faint', { style: 'font-size:12px' });
+  const epZeile = el('tr', {}, [el('td', {}, [el('div', { text: '− Eigenprovision' }), epUnter]), epZelle, el('td'), el('td')]);
+  const kpText = el('div', { text: 'Kaufpreis / Anschaffungskosten' });
   const status = el('span.badge', { style: 'margin-left:8px' });
   const warnung = el('div.hint', { style: 'margin-top:6px;color:var(--warn)' });
   const sofortZeile = el('div.hint', { style: 'margin-top:6px' });
@@ -787,11 +791,17 @@ function aufteilungBlock(o, geaendert) {
     ak.inv.textContent = auf.inventar ? eur(a.inventar) : '–';
     ak.rl.textContent = auf.ruecklage ? 'keine AfA' : '–';
     ak.summe.textContent = eur(g.gebaeude + g.grundstueck + a.inventar);
-    kpZelle.textContent = eur(auf.kaufpreis);
+    kpZelle.textContent = eur(auf.kaufpreisSteuer);
+    epZeile.style.display = auf.eigenprovision ? '' : 'none';
+    epZelle.textContent = `− ${eur(auf.eigenprovision)}`;
+    epUnter.textContent = `vom beurkundeten Kaufpreis ${eur(auf.kaufpreis)} · mindert den Kaufpreis, nicht die Nebenkosten`;
+    kpText.textContent = auf.eigenprovision ? 'Steuerlicher Kaufpreis / Anschaffungskosten' : 'Kaufpreis / Anschaffungskosten';
 
     status.textContent = o.grundstueckBetrag != null ? 'fest als Betrag' : 'fest in %';
-    proHinweis.textContent = auf.inventar || auf.ruecklage
-      ? `Prozent bezogen auf den Kaufpreis ohne Inventar und Rücklage (${eur(kp)}).` : '';
+    proHinweis.textContent = auf.inventar || auf.ruecklage || auf.eigenprovision
+      ? `Prozent bezogen auf den steuerlichen Kaufpreis der Immobilie (${eur(kp)}`
+        + (auf.eigenprovision ? ', nach Eigenprovision' : '') + (auf.inventar || auf.ruecklage ? ', ohne Inventar und Rücklage' : '') + ').'
+      : '';
     warnung.textContent = o.gebaeudeanteilManuell != null
       ? 'In den steuerlichen Angaben ist eine AfA-Bemessungsgrundlage von Hand gesetzt – für die AfA gilt diese, nicht diese Aufteilung.'
       : (o.grundstueckBetrag != null && kp && o.grundstueckBetrag > kp ? 'Der Grundstücksanteil ist größer als der Kaufpreis der Immobilie.' : '');
@@ -865,7 +875,8 @@ function aufteilungBlock(o, geaendert) {
         el('tr', {}, [name('Grundstück', 'keine AfA'), zelle(grdEur), zelle(grdPro, '%'), ak.grd]),
         el('tr', {}, [name('Inventar', 'z. B. Einbauküche · eigene AfA'), zelle(invEur), zelle(invJahre, 'Jahre'), ak.inv]),
         el('tr', {}, [name('Anteil Erhaltungsrücklage', 'im Kaufpreis enthalten'), zelle(rlEur), el('td'), ak.rl]),
-        el('tr', {}, [el('td', { text: 'Kaufpreis / Anschaffungskosten', style: 'font-weight:600' }), kpZelle, el('td'), ak.summe]),
+        epZeile,
+        el('tr', {}, [el('td', { style: 'font-weight:600' }, [kpText]), kpZelle, el('td'), ak.summe]),
       ]),
     ])]),
     proHinweis,
