@@ -81,8 +81,53 @@ export function effektiverSteuersatz(o) {
  * danach ändert, verschiebt dann den Prozentsatz, nicht den Betrag.
  * Die Kaufnebenkosten folgen demselben Verhältnis.
  */
-export function grundstuecksquote(o) {
+/**
+ * Was der Kaufpreis enthält und wie die Kaufnebenkosten darauf entfallen.
+ *
+ *   Kaufpreis = Immobilie (Grund + Gebäude) + Inventar + Rücklagenanteil
+ *
+ * - Der Anteil an der **Erhaltungsrücklage** gehört nicht zu den
+ *   Anschaffungskosten (H 7.3 EStH, BFH) – eine Geldforderung, keine AfA.
+ * - **Inventar** (z. B. Einbauküche) ist ein eigenes Wirtschaftsgut mit
+ *   eigener AfA, üblich 10 Jahre (BFH IX R 14/15).
+ * - **Aktivierungspflichtige Nebenkosten** (Grunderwerbsteuer, Notar und
+ *   Grundbuch für Kauf und Eigentum, Makler) werden auf Immobilie und
+ *   Inventar im Verhältnis der Kaufpreisanteile verteilt; eine
+ *   Eigenprovision mindert sie. Sofort abziehbare Positionen
+ *   (Geldbeschaffung) bleiben außen vor – siehe sofortAbziehbar().
+ *
+ * Ohne Inventar, Rücklagenanteil und sofort abziehbare Positionen ist
+ * `immobilie` genau Kaufpreis + Nebenkosten − Eigenprovision, wie bisher.
+ */
+export function anschaffungsAufteilung(o) {
+  const nk = nebenkostenBerechnen(o);
   const kp = o?.kaufpreis || 0;
+  const inventar = Math.min(kp, Math.max(0, o?.inventar || 0));
+  const ruecklage = Math.min(kp - inventar, Math.max(0, o?.ruecklageAnteil || 0));
+  const kaufpreisImmobilie = kp - inventar - ruecklage;
+  const verteilbasis = kp - ruecklage;
+  const nebenkostenAktiv = nk.summe - nk.sofort - nk.eigenprovision;
+  const anteilImmobilie = verteilbasis > 0 ? kaufpreisImmobilie / verteilbasis : 1;
+  return {
+    kaufpreis: kp, kaufpreisImmobilie, inventar, ruecklage,
+    nebenkostenAktiv, sofort: nk.sofort,
+    immobilie: Math.max(0, kaufpreisImmobilie + nebenkostenAktiv * anteilImmobilie),
+    inventarAnschaffung: inventar ? Math.max(0, inventar + nebenkostenAktiv * (1 - anteilImmobilie)) : 0,
+  };
+}
+
+/**
+ * Sofort abziehbare Kaufnebenkosten – Werbungskosten im Jahr des Kaufs
+ * (Abfluss, § 11 EStG), etwa Notar und Grundbuch für die Grundschuld.
+ */
+export function sofortAbziehbar(o, jahr) {
+  const kaufjahr = o?.kaufdatum ? Number(o.kaufdatum.slice(0, 4)) : null;
+  if (kaufjahr !== jahr) return 0;
+  return nebenkostenBerechnen(o).sofort;
+}
+
+export function grundstuecksquote(o) {
+  const kp = anschaffungsAufteilung(o).kaufpreisImmobilie;
   if (o?.grundstueckBetrag != null && kp > 0) {
     return Math.min(100, Math.max(0, (o.grundstueckBetrag / kp) * 100));
   }
@@ -90,7 +135,7 @@ export function grundstuecksquote(o) {
 }
 
 export function gebaeudeAnschaffung(o) {
-  const anschaffung = nebenkostenBerechnen(o).gesamt;
+  const anschaffung = anschaffungsAufteilung(o).immobilie;
   const gebaeudeVorgabe = o.gebaeudeanteilManuell != null
     ? Math.min(Math.max(0, o.gebaeudeanteilManuell), anschaffung)
     : null;
@@ -241,10 +286,16 @@ export function afaWerte(o) {
      geaenderte oder geloeschte Position wirkt sich damit automatisch aus. */
   const modernisierung = aktivierteMassnahmen(o);
   const gebaeude = g.gebaeude + modernisierung;
+  const auf = anschaffungsAufteilung(o);
+  const inventarDauer = Math.max(1, o.inventarNutzungsdauer || 10);
   return {
     anschaffung: g.anschaffung, grundstueck: g.grundstueck, gebaeude, modernisierung,
     afaJahr: gebaeude * ((o.afaSatz ?? 0) / 100),
     afaDauer: o.afaSatz ? 100 / o.afaSatz : 0,
+    inventar: auf.inventarAnschaffung,
+    inventarDauer,
+    inventarAfaJahr: auf.inventarAnschaffung / inventarDauer,
+    ruecklage: auf.ruecklage,
   };
 }
 
@@ -269,12 +320,29 @@ export function besitzMonateBis(o, jahr, bisMonat = 12) {
  * aufgelaufenen Anteil. Mit der Vorgabe 12 ergibt sich der volle Jahreswert.
  */
 export function afaImJahr(o, jahr, bisMonat = 12) {
+  return afaGebaeudeImJahr(o, jahr, bisMonat) + afaInventarImJahr(o, jahr, bisMonat);
+}
+
+/** Gebäude-AfA eines Jahres (§ 7 Abs. 4 EStG). */
+export function afaGebaeudeImJahr(o, jahr, bisMonat = 12) {
   const a = afaWerte(o);
-  if (!a.afaDauer || !a.afaJahr) return 0;
+  return afaLinear(o, jahr, bisMonat, a.afaJahr, a.afaDauer);
+}
+
+/** AfA des mitgekauften Inventars (§ 7 Abs. 1 EStG), eigene Nutzungsdauer. */
+export function afaInventarImJahr(o, jahr, bisMonat = 12) {
+  const a = afaWerte(o);
+  return afaLinear(o, jahr, bisMonat, a.inventarAfaJahr, a.inventar ? a.inventarDauer : 0);
+}
+
+/* Linear ab dem Kaufmonat. Im letzten Jahr nur der Rest, damit in Summe
+   nie mehr als die Bemessungsgrundlage abgeschrieben wird. */
+function afaLinear(o, jahr, bisMonat, jahresbetrag, dauer) {
+  if (!dauer || !jahresbetrag) return 0;
   const kaufjahr = o.kaufdatum ? Number(o.kaufdatum.slice(0, 4)) : jahr;
   if (jahr < kaufjahr) return 0;
-  if (jahr >= kaufjahr + a.afaDauer) return 0;
-  return a.afaJahr * besitzMonateBis(o, jahr, bisMonat) / 12;
+  if (jahr >= kaufjahr + dauer) return 0;
+  return jahresbetrag * besitzMonateBis(o, jahr, bisMonat) / 12;
 }
 
 /**
@@ -382,7 +450,8 @@ export function objektKennzahlen(o, stichtag = heuteISO()) {
      ist.werbungskostenFrei mit dem Zahlungsbetrag – dadurch wichen
      Kennzahlen und Anlage V voneinander ab. */
   const erhaltungSteuer = erhaltungSteuerlich(o.id, jahr);
-  const werbungskostenFreiSteuerlich = erhaltungSteuer + ist.fahrtkosten + ist.sonstigeWkGesamt;
+  const werbungskostenFreiSteuerlich = erhaltungSteuer + ist.fahrtkosten + ist.sonstigeWkGesamt
+    + sofortAbziehbar(o, jahr);
   const werbungskosten = ist.bewirtschaftungSteuerlich + ist.betriebskostenUmlagefaehig
     + zins + afaJahr + werbungskostenFreiSteuerlich;
   const einkuenfte = ist.miete + ist.umlagen - werbungskosten;
@@ -580,6 +649,7 @@ export function kapitalbindung(o, stichtag = heuteISO()) {
       - ist.betriebskostenUmlagefaehig - ist.zins
       // wie oben: steuerlicher Erhaltungsaufwand, nicht der gezahlte
       - (erhaltungSteuerlich(o.id, j) + ist.fahrtkosten + ist.sonstigeWkGesamt)
+      - (besitzMonateBis(o, j, grenze) ? sofortAbziehbar(o, j) : 0)
       - afaImJahr(o, j, grenze);
     vor += cfVor;
     /* Getrennt gefuehrt, nicht eingerechnet: Eine Erstattung auf Verluste

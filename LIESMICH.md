@@ -297,6 +297,7 @@ werden bewusst nicht verglichen; die laufen auf zwei Geräten ohnehin auseinande
 | 27 | Nebenkosten: Positionen mit Fälligkeit, Monatsübersicht, umlagefähig und Rücklage | fertig |
 | 28 | Nebenkosten: Gültigkeit ab/bis, Abrechnung buchen, Frist, Vorauszahlung anpassen, Rücklage-Entnahme | fertig |
 | 29 | Aufteilung des Kaufpreises in Gebäude und Grundstück, als Betrag oder in % | fertig |
+| 30 | Anschaffungskosten: Grundschuld sofort abziehbar, Inventar mit eigener AfA, Rücklagenanteil ohne AfA | fertig |
 
 ## Aufbau des Codes
 
@@ -519,7 +520,25 @@ mit. Der so ermittelte Grundstücksanteil wird auf die **Anschaffungskosten inkl
 angewendet; die Kaufnebenkosten werden damit im selben Verhältnis wie der Kaufpreis
 aufgeteilt. Die steuerlichen Angaben zeigen den Anteil nur noch an. Weist ein Gutachten den
 Gebäudewert dagegen bereits **einschließlich** Nebenkosten aus, trägst du ihn unter
-„Gebäudeanteil, manuell" ein – er ersetzt dann die Aufteilung.
+„AfA-Bemessungsgrundlage, manuell" ein – er ersetzt dann die Aufteilung.
+
+Was wohin gehört (H 7.3 EStH, § 9 und § 11 EStG):
+
+| Teil des Kaufs | steuerlich | in der App |
+|---|---|---|
+| Gebäudeanteil des Kaufpreises + anteilige Grunderwerbsteuer, Notar und Grundbuch für Kauf und Eigentum, Makler | Gebäude-AfA (2 / 2,5 / 3 %) | Spalte *inkl. Nebenkosten*, Zeile Gebäude |
+| Grundstücksanteil + anteilige Nebenkosten | keine AfA | Zeile Grundstück |
+| Mitgekauftes Inventar, z. B. Einbauküche, im Vertrag gesondert ausgewiesen | eigene AfA, üblich 10 Jahre (BFH IX R 14/15) | Zeile Inventar, Nutzungsdauer wählbar |
+| Übernommener Anteil an der Erhaltungsrücklage | keine Anschaffungskosten, keine AfA | Zeile Anteil Erhaltungsrücklage |
+| Notar und Grundbuch für die **Grundschuld** (Finanzierung) | sofort abziehbare Werbungskosten im Kaufjahr | Position mit Haken *sofort abziehbar*, Knopf „+ Grundschuld“ |
+
+Die Nebenkosten werden im Verhältnis der Kaufpreisanteile auf Gebäude, Grundstück und
+Inventar verteilt; der Rücklagenanteil bekommt keinen Anteil. Das ist eine Vereinfachung: Auf
+Inventar fällt streng genommen keine Grunderwerbsteuer an. Sofort abziehbare Positionen zählen
+zur Gesamtinvestition und zum Eigenkapital, aber nicht zu den Anschaffungskosten; in der Anlage V
+stehen sie im Kaufjahr als *Geldbeschaffungskosten*, die Inventar-AfA als *AfA bewegliche
+Wirtschaftsgüter*. Die Excel-Mappe kennt Inventar, Rücklagenanteil und sofort abziehbare
+Positionen nicht.
 Im Anschaffungsjahr wird die AfA ab dem Kaufmonat zeitanteilig angesetzt. Der AfA-Satz ist
 frei eingebbar – für ein Restnutzungsdauer-Gutachten trägst du z. B. 3,226 % ein (31 Jahre).
 

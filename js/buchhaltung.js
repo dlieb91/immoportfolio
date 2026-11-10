@@ -23,7 +23,7 @@ import { heuteISO, datumPlus } from './util.js';
 import {
   state, objekt as objektMit, einheitMit, einheitName, objektVonEinheit,
   flaecheVon, einheitenVon, mieteEinheit, buchungenVon, fahrtenVon,
-  besitzMonate, aktiveVertraege, mieteVon,
+  besitzMonate, aktiveVertraege, mieteVon, nebenkostenBerechnen,
 } from './store.js';
 import { kostenJahr } from './betriebskosten.js';
 import {
@@ -31,7 +31,12 @@ import {
 } from './zahlungen.js';
 import {
   afaWerte, afaImJahr, anschaffungsnahePruefung, gebaeudeAnschaffung, erhaltungSteuerlich,
+  afaGebaeudeImJahr, afaInventarImJahr, sofortAbziehbar,
 } from './kennzahlen.js';
+
+/* Anlage-V-Zeilen für die beiden neuen Positionen */
+const LABEL_INVENTAR = 'Werbungskosten: AfA bewegliche Wirtschaftsgüter';
+const LABEL_GELDBESCHAFFUNG = 'Werbungskosten: Geldbeschaffungskosten';
 
 // Die 15-%-Pruefung liegt in kennzahlen.js, weil afaWerte() sie braucht –
 // hier nur weitergereicht, damit die Ansichten einen Ort haben.
@@ -385,12 +390,14 @@ export function verteilungenOffen(objektId, abJahr) {
  *   erhaltung  – je Maßnahme, mit der Verteilung nach § 82b EStDV
  *   posten     – die einzelnen Zahlungen, monatlich oder frei erfasst
  */
+const eur0 = (v) => `${Math.round(v).toLocaleString('de-DE')} €`;
+
 export function werbungskostenHerleitung(o, jahr) {
   const raus = [];
 
   /* --- Abschreibung --- */
   const a = afaWerte(o);
-  const afaBetrag = afaImJahr(o, jahr);
+  const afaBetrag = afaGebaeudeImJahr(o, jahr);
   if (afaBetrag) {
     const monate = a.afaJahr ? Math.round(afaBetrag / a.afaJahr * 12) : 0;
     raus.push({
@@ -408,6 +415,28 @@ export function werbungskostenHerleitung(o, jahr) {
         monate,
         betrag: afaBetrag,
       },
+    });
+  }
+
+  /* --- Inventar: eigene AfA (z. B. Einbauküche, 10 Jahre) --- */
+  const afaInventar = afaInventarImJahr(o, jahr);
+  if (afaInventar) {
+    raus.push({
+      label: LABEL_INVENTAR, art: 'inventar', betrag: -afaInventar,
+      posten: [{
+        text: 'Mitgekauftes Inventar', betrag: afaInventar,
+        hinweis: `${eur0(a.inventar)} inkl. anteiliger Nebenkosten über ${a.inventarDauer} Jahre`,
+      }],
+    });
+  }
+
+  /* --- Geldbeschaffungskosten des Kaufs: sofort im Kaufjahr --- */
+  if (sofortAbziehbar(o, jahr)) {
+    const posten = nebenkostenBerechnen(o).weitere.filter((p) => p.sofort && p.betrag)
+      .map((p) => ({ text: p.bezeichnung || 'Kaufnebenkosten', betrag: p.betrag, datum: o.kaufdatum, hinweis: 'sofort abziehbar, kein Teil der Anschaffungskosten' }));
+    raus.push({
+      label: LABEL_GELDBESCHAFFUNG, art: 'geldbeschaffung', posten,
+      betrag: -posten.reduce((s, x) => s + x.betrag, 0),
     });
   }
 
@@ -590,7 +619,9 @@ function monatsSpanne(zeilen) {
 
 export function anlageVAufstellung(o, jahr) {
   const ist = jahresSummen(o.id, jahr);
-  const afaJahr = afaImJahr(o, jahr);
+  const afaJahr = afaGebaeudeImJahr(o, jahr);
+  const afaInventar = afaInventarImJahr(o, jahr);
+  const geldbeschaffung = sofortAbziehbar(o, jahr);
 
   const bucket = new Map();
   for (const k of KATEGORIEN) {
@@ -616,6 +647,8 @@ export function anlageVAufstellung(o, jahr) {
 
   const einnahmen = [];
   const werbungskosten = [{ label: 'Werbungskosten: AfA', betrag: -afaJahr }];
+  if (afaInventar) werbungskosten.push({ label: LABEL_INVENTAR, betrag: -afaInventar });
+  if (geldbeschaffung) werbungskosten.push({ label: LABEL_GELDBESCHAFFUNG, betrag: -geldbeschaffung });
   for (const [label, betrag] of bucket) {
     (betrag >= 0 ? einnahmen : werbungskosten).push({ label, betrag });
   }

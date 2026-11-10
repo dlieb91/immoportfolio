@@ -24,7 +24,7 @@ import {
 import {
   tilgungsplan, restschuldZu, ersatzGuthabenZu, ersatzEingezahltBis,
 } from './finanzmathematik.js';
-import { afaImJahr, afaWerte, eingesetztesKapital } from './kennzahlen.js';
+import { afaImJahr, afaWerte, eingesetztesKapital, sofortAbziehbar } from './kennzahlen.js';
 import { kostenJahr } from './betriebskosten.js';
 
 export const SZENARIEN = [
@@ -217,7 +217,8 @@ export function prognose(params, stichtag = heuteISO(), objektIds = null) {
       /* Die Instandhaltungsrücklage mindert den Cashflow, aber nicht die
          Einkünfte – abziehbar wird sie erst bei Verausgabung durch die
          Gemeinschaft (BFH IX R 19/24). Siehe kennzahlen.js. */
-      const einkuenfte = miete - bewirtschaftung - zins - afa;
+      // Geldbeschaffungskosten des Kaufs: einmalig im Kaufjahr
+      const einkuenfte = miete - bewirtschaftung - zins - afa - sofortAbziehbar(o, jahr);
       const steuer = einkuenfte * steuersatzFuer(o, params) / 100;
 
       if (anteil > 0 && anteil < 1) zeile.rumpfjahr = true;
@@ -299,7 +300,7 @@ function verkaufRechnen(verkaufsJahr, jahre, params, startJahr) {
     // als Bemessungsgrundlage ansetzt, sonst weicht der Buchwert von der
     // tatsächlich abgeschriebenen Basis ab.
     const a = afaWerte(o);
-    const anschaffung = a.gebaeude + a.grundstueck;
+    const anschaffung = a.gebaeude + a.grundstueck + a.inventar;
     const buchwert = Math.max(0, anschaffung - kumAfa);
 
     const haltedauer = verkaufsJahr - kaufjahr;

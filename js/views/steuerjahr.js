@@ -288,7 +288,7 @@ function herleitungsKarte(o, jahr) {
 
     if (pos.art === 'afa') {
       const r = pos.rechnung;
-      zeilen.push(zeile('Anschaffungskosten inkl. Nebenkosten', null, r.anschaffung));
+      zeilen.push(zeile('Anschaffungskosten Gebäude und Grundstück', 'Kaufpreis inkl. aktivierungspflichtiger Nebenkosten', r.anschaffung));
       zeilen.push(zeile('abzüglich Grundstücksanteil', null, -r.grundstueck));
       if (r.modernisierung) zeilen.push(zeile('zuzüglich aktivierte Modernisierung', null, r.modernisierung));
       zeilen.push(zeile('AfA-Bemessungsgrundlage', null, r.gebaeude, true));

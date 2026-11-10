@@ -402,11 +402,16 @@ export function nebenkostenBerechnen(obj) {
   };
   const summe = posten.grunderwerbsteuer + posten.notar + posten.makler
     + weitere.reduce((s, p) => s + p.betrag, 0);
+  /* Sofort abziehbar sind Kosten der Finanzierung, nicht des Erwerbs –
+     typisch Notar und Grundbuch für die Grundschuld (Geldbeschaffungskosten).
+     Sie gehören zur Gesamtinvestition, nicht zu den Anschaffungskosten. */
+  const sofort = weitere.filter((p) => p.sofort).reduce((s, p) => s + p.betrag, 0);
   const eigenprovision = obj.eigenprovision || 0;
   return {
     ...posten,
     weitere,
     summe,
+    sofort,
     eigenprovision,
     quote: kp ? (summe / kp) * 100 : 0,
     gesamt: Math.max(0, kp + summe - eigenprovision),
@@ -446,6 +451,12 @@ export function neuesObjekt(einstellungen = STANDARD_EINSTELLUNGEN) {
        als Betrag eingegeben wurde; dann wird grundstuecksanteil daraus
        nachgeführt (kennzahlen.js:grundstuecksquote). Leer = der Prozentsatz gilt. */
     grundstueckBetrag: null,
+    /* Im Kaufpreis enthalten, aber kein Gebäude und kein Grundstück:
+       mitgekauftes Inventar (eigene AfA, Vorgabe 10 Jahre) und der
+       übernommene Anteil an der Erhaltungsrücklage (keine AfA, H 7.3 EStH). */
+    inventar: null,
+    inventarNutzungsdauer: 10,
+    ruecklageAnteil: null,
     gebaeudeanteilManuell: null,   // € · leer = aus grundstuecksanteil abgeleitet
     afaSatz: 2,                    // % p.a.
     // {id, datum, betrag, bezeichnung, aktiviert} – aktiviert wie bei den

@@ -25,6 +25,7 @@ import {
 } from './finanzierungen.js';
 import {
   afaWerte, objektKennzahlen, steuerModus, effektiverSteuersatz, kapitalbindung, grundstuecksquote,
+  anschaffungsAufteilung, gebaeudeAnschaffung,
 } from '../kennzahlen.js';
 import {
   KATEGORIEN, nkAbrechnungObjekt, erhaltungsAmpel, fahrtBetrag, spekulationsfrist, anschaffungsnahePruefung,
@@ -669,15 +670,27 @@ function finanzierungenKarte(o, neuZeichnen) {
 
 const NK_MODI = [{ wert: 'prozent', text: '%' }, { wert: 'betrag', text: '€' }];
 
-function nkZeile(o, label, pos, { umbauen, werteNeu, betraege, entfernen, bezeichnungBearbeitbar } = {}) {
+function nkZeile(o, label, pos, { umbauen, werteNeu, betraege, entfernen, bezeichnungBearbeitbar, sofortSchalter } = {}) {
   const neuZeichnen = umbauen;
 
-  const nameZelle = bezeichnungBearbeitbar
+  const nameFeld = bezeichnungBearbeitbar
     ? el('input', {
         type: 'text', value: pos.bezeichnung || '', placeholder: 'Bezeichnung',
         onchange: (e) => aendern(() => { pos.bezeichnung = e.target.value; }),
       })
     : el('span', { text: label });
+  /* Geldbeschaffungskosten (Grundschuld) sind keine Anschaffungskosten,
+     sondern Werbungskosten im Kaufjahr. */
+  const nameZelle = sofortSchalter ? el('div', {}, [
+    nameFeld,
+    el('label', {
+      style: 'display:flex;gap:6px;align-items:center;font-size:12px;margin-top:4px;cursor:pointer;color:var(--text-dim)',
+      title: 'Kosten der Finanzierung, nicht des Erwerbs – z. B. Notar und Grundbuch für die Grundschuld',
+    }, [
+      el('input', { type: 'checkbox', checked: !!pos.sofort, onchange: (e) => { aendern(() => { pos.sofort = e.target.checked; }); werteNeu(); } }),
+      'sofort abziehbar (Finanzierung)',
+    ]),
+  ]) : nameFeld;
 
   const betragZelle = el('td.num', { style: 'width:130px;color:var(--text-dim)' });
   const betragNeu = () => {
@@ -732,83 +745,136 @@ function nkZeile(o, label, pos, { umbauen, werteNeu, betraege, entfernen, bezeic
 }
 
 /**
- * Aufteilung des Kaufpreises in Gebäude und Grundstück – je als Betrag oder
- * Prozentsatz. Was zuletzt eingegeben wurde, ist fest: ein Betrag bleibt bei
- * einer Kaufpreisänderung gleich (grundstueckBetrag), ein Prozentsatz wandert
- * mit (grundstuecksanteil). Die drei übrigen Felder werden berechnet.
+ * Aufteilung des Kaufpreises: Gebäude und Grundstück je als Betrag oder
+ * Prozentsatz – was zuletzt eingegeben wurde, ist fest: ein Betrag bleibt
+ * bei einer Kaufpreisänderung gleich (grundstueckBetrag), ein Prozentsatz
+ * wandert mit (grundstuecksanteil). Dazu, was sonst im Kaufpreis steckt:
+ * Inventar (eigene AfA) und der Anteil an der Erhaltungsrücklage (keine AfA).
+ * Die letzte Spalte zeigt die Anschaffungskosten inkl. anteiliger
+ * Nebenkosten – beim Gebäude ist das die AfA-Bemessungsgrundlage.
  */
 function aufteilungBlock(o, geaendert) {
-  const zeigen = (v, nk) => (v == null || !Number.isFinite(v) ? '' : num(v, nk));
-  const eingabe = () => el('input', { type: 'text', inputmode: 'decimal', style: 'text-align:right' });
+  const zeigen = (v, nk = 2) => (v == null || !Number.isFinite(v) ? '' : num(v, nk));
+  const eingabe = (platzhalter = '') => el('input', { type: 'text', inputmode: 'decimal', style: 'text-align:right', placeholder: platzhalter });
   const gebEur = eingabe(), gebPro = eingabe(), grdEur = eingabe(), grdPro = eingabe();
+  const invEur = eingabe('0,00'), invJahre = eingabe('10'), rlEur = eingabe('0,00');
+  const ak = { geb: el('td.num'), grd: el('td.num'), inv: el('td.num'), rl: el('td.num.faint'), summe: el('td.num', { style: 'font-weight:600' }) };
+  const kpZelle = el('td.num', { style: 'font-weight:600' });
   const status = el('span.badge', { style: 'margin-left:8px' });
   const warnung = el('div.hint', { style: 'margin-top:6px;color:var(--warn)' });
+  const sofortZeile = el('div.hint', { style: 'margin-top:6px' });
+  const proHinweis = el('div.faint', { style: 'font-size:12px;margin-top:4px' });
 
   const neu = () => {
-    const kp = o.kaufpreis || 0;
+    const auf = anschaffungsAufteilung(o);
+    const kp = auf.kaufpreisImmobilie;
     const quote = grundstuecksquote(o);
     const grd = o.grundstueckBetrag != null ? Math.min(o.grundstueckBetrag, kp || o.grundstueckBetrag) : kp * quote / 100;
-    gebEur.value = kp ? zeigen(kp - grd, 2) : '';
-    grdEur.value = kp ? zeigen(grd, 2) : '';
-    gebPro.value = zeigen(100 - quote, 2);
-    grdPro.value = zeigen(quote, 2);
+    gebEur.value = kp ? zeigen(kp - grd) : '';
+    grdEur.value = kp ? zeigen(grd) : '';
+    gebPro.value = zeigen(100 - quote);
+    grdPro.value = zeigen(quote);
     gebEur.disabled = grdEur.disabled = !kp;
+    invEur.value = o.inventar ? zeigen(o.inventar) : '';
+    invJahre.value = o.inventar ? zeigen(o.inventarNutzungsdauer || 10, 0) : '';
+    invJahre.disabled = !o.inventar;
+    rlEur.value = o.ruecklageAnteil ? zeigen(o.ruecklageAnteil) : '';
+
+    const g = gebaeudeAnschaffung(o);
+    const a = afaWerte(o);
+    ak.geb.textContent = eur(g.gebaeude);
+    ak.grd.textContent = eur(g.grundstueck);
+    ak.inv.textContent = auf.inventar ? eur(a.inventar) : '–';
+    ak.rl.textContent = auf.ruecklage ? 'keine AfA' : '–';
+    ak.summe.textContent = eur(g.gebaeude + g.grundstueck + a.inventar);
+    kpZelle.textContent = eur(auf.kaufpreis);
+
     status.textContent = o.grundstueckBetrag != null ? 'fest als Betrag' : 'fest in %';
+    proHinweis.textContent = auf.inventar || auf.ruecklage
+      ? `Prozent bezogen auf den Kaufpreis ohne Inventar und Rücklage (${eur(kp)}).` : '';
     warnung.textContent = o.gebaeudeanteilManuell != null
-      ? 'In den steuerlichen Angaben ist ein manueller Gebäudeanteil gesetzt – für die AfA gilt dieser, nicht diese Aufteilung.'
-      : (o.grundstueckBetrag != null && kp && o.grundstueckBetrag > kp ? 'Der Grundstücksanteil ist größer als der Kaufpreis.' : '');
+      ? 'In den steuerlichen Angaben ist eine AfA-Bemessungsgrundlage von Hand gesetzt – für die AfA gilt diese, nicht diese Aufteilung.'
+      : (o.grundstueckBetrag != null && kp && o.grundstueckBetrag > kp ? 'Der Grundstücksanteil ist größer als der Kaufpreis der Immobilie.' : '');
+    sofortZeile.textContent = auf.sofort
+      ? `Nicht enthalten: ${eur(auf.sofort)} sofort abziehbare Kaufnebenkosten (Geldbeschaffung) – Werbungskosten im Kaufjahr.`
+      : '';
+  };
+
+  const festNachfuehren = () => {
+    if (o.grundstueckBetrag != null && o.kaufpreis) o.grundstuecksanteil = grundstuecksquote(o);
   };
 
   const setzen = (feld, wert) => {
-    const kp = o.kaufpreis || 0;
-    if (wert == null) { neu(); return; }
-    aendern(() => {
-      if (feld === 'gebEur' || feld === 'grdEur') {
-        const grd = feld === 'grdEur' ? wert : kp - wert;
-        o.grundstueckBetrag = Math.round(Math.min(kp, Math.max(0, grd)) * 100) / 100;
-        o.grundstuecksanteil = kp ? (o.grundstueckBetrag / kp) * 100 : o.grundstuecksanteil;
-      } else {
-        const anteil = feld === 'grdPro' ? wert : 100 - wert;
-        o.grundstuecksanteil = Math.min(100, Math.max(0, anteil));
-        o.grundstueckBetrag = null;
-      }
-    });
+    const kp = anschaffungsAufteilung(o).kaufpreisImmobilie;
+    if (feld === 'inv' || feld === 'rl') {
+      aendern(() => {
+        if (feld === 'inv') o.inventar = wert ? Math.max(0, wert) : null;
+        else o.ruecklageAnteil = wert ? Math.max(0, wert) : null;
+        festNachfuehren();
+      });
+    } else if (feld === 'invJahre') {
+      if (wert == null || wert < 1) { neu(); return; }
+      aendern(() => { o.inventarNutzungsdauer = Math.round(wert); });
+    } else {
+      if (wert == null) { neu(); return; }
+      aendern(() => {
+        if (feld === 'gebEur' || feld === 'grdEur') {
+          const grd = feld === 'grdEur' ? wert : kp - wert;
+          o.grundstueckBetrag = Math.round(Math.min(kp, Math.max(0, grd)) * 100) / 100;
+          o.grundstuecksanteil = kp ? (o.grundstueckBetrag / kp) * 100 : o.grundstuecksanteil;
+        } else {
+          const anteil = feld === 'grdPro' ? wert : 100 - wert;
+          o.grundstuecksanteil = Math.min(100, Math.max(0, anteil));
+          o.grundstueckBetrag = null;
+        }
+      });
+    }
     neu();
     geaendert();
   };
-  for (const [feld, input] of [['gebEur', gebEur], ['gebPro', gebPro], ['grdEur', grdEur], ['grdPro', grdPro]]) {
+  for (const [feld, input] of [['gebEur', gebEur], ['gebPro', gebPro], ['grdEur', grdEur], ['grdPro', grdPro],
+    ['inv', invEur], ['invJahre', invJahre], ['rl', rlEur]]) {
     input.addEventListener('change', (e) => setzen(feld, parseZahl(e.target.value)));
   }
 
-  /** Nach einer Kaufpreisänderung: Prozentsatz zum festen Betrag nachführen. */
+  /** Nach einer Änderung von Kaufpreis oder Nebenkosten. */
   const kaufpreisGeaendert = () => {
-    if (o.grundstueckBetrag != null && o.kaufpreis) {
-      aendern(() => { o.grundstuecksanteil = grundstuecksquote(o); });
-    }
+    if (o.grundstueckBetrag != null && o.kaufpreis) aendern(festNachfuehren);
     neu();
   };
 
-  const zelle = (input) => el('td', { style: 'width:170px' }, [input]);
+  const zelle = (input, suffix) => el('td', { style: 'width:150px' }, [suffix
+    ? el('div.input-suffix', {}, [input, el('span', { text: suffix })]) : input]);
+  invJahre.style.paddingRight = '52px';
+  gebPro.style.paddingRight = grdPro.style.paddingRight = '34px';
+  const name = (text, unter) => el('td', {}, [el('div', { text }), unter ? el('div.faint', { text: unter, style: 'font-size:12px' }) : null]);
   neu();
   const knoten = el('div', { style: 'margin-top:16px;padding-top:12px;border-top:1px solid var(--border)' }, [
     el('div', { style: 'font-weight:600;font-size:14px;margin-bottom:6px;display:flex;align-items:center;flex-wrap:wrap' }, [
       'Aufteilung des Kaufpreises', status,
     ]),
-    el('div.tabelle-scroll', {}, [el('table.data.kompakt', {}, [
+    el('div.tabelle-scroll', {}, [el('table.data.kompakt.liste', {}, [
       el('thead', {}, [el('tr', {}, [
         el('th', { text: '' }),
         el('th', { style: 'text-align:right', text: 'Betrag (€)' }),
-        el('th', { style: 'text-align:right', text: 'Anteil (%)' }),
+        el('th', { style: 'text-align:right', text: 'Anteil' }),
+        el('th', { style: 'text-align:right', text: 'inkl. Nebenkosten' }),
       ])]),
       el('tbody', {}, [
-        el('tr', {}, [el('td', { text: 'Gebäude' }), zelle(gebEur), zelle(gebPro)]),
-        el('tr', {}, [el('td', { text: 'Grundstück' }), zelle(grdEur), zelle(grdPro)]),
+        el('tr', {}, [name('Gebäude', 'AfA-Bemessungsgrundlage'), zelle(gebEur), zelle(gebPro, '%'), ak.geb]),
+        el('tr', {}, [name('Grundstück', 'keine AfA'), zelle(grdEur), zelle(grdPro, '%'), ak.grd]),
+        el('tr', {}, [name('Inventar', 'z. B. Einbauküche · eigene AfA'), zelle(invEur), zelle(invJahre, 'Jahre'), ak.inv]),
+        el('tr', {}, [name('Anteil Erhaltungsrücklage', 'im Kaufpreis enthalten'), zelle(rlEur), el('td'), ak.rl]),
+        el('tr', {}, [el('td', { text: 'Kaufpreis / Anschaffungskosten', style: 'font-weight:600' }), kpZelle, el('td'), ak.summe]),
       ]),
     ])]),
+    proHinweis,
     warnung,
+    sofortZeile,
     el('div.hint', { style: 'margin-top:6px', text: 'Ein Feld eingeben, die anderen rechnen sich aus. Ein Betrag bleibt fest, wenn sich der '
-      + 'Kaufpreis ändert, ein Prozentsatz wandert mit. Die Kaufnebenkosten werden im selben Verhältnis aufgeteilt – '
-      + 'daraus ergibt sich die AfA-Bemessungsgrundlage.' }),
+      + 'Kaufpreis ändert, ein Prozentsatz wandert mit. Grunderwerbsteuer, Notar, Grundbuch und Makler werden im Verhältnis '
+      + 'der Kaufpreisanteile auf Gebäude, Grundstück und Inventar verteilt (letzte Spalte). Inventar und Rücklagenanteil '
+      + 'müssen im Kaufvertrag gesondert ausgewiesen sein; die Rücklage gehört nicht zu den Anschaffungskosten (H 7.3 EStH).' }),
   ]);
   return { knoten, kaufpreisGeaendert };
 }
@@ -838,7 +904,7 @@ function kaufKarte(o, umbauen, obenNeu) {
     eigenprovZelle.textContent = '− ' + eur(r.eigenprovision);
     gesamtZelle.textContent = eur(r.gesamt);
   };
-  const werteNeu = () => { anzeigeNeu(); obenNeu(); };
+  const werteNeu = () => { anzeigeNeu(); aufteilung.kaufpreisGeaendert(); obenNeu(); };
 
   const aktionen = { umbauen, werteNeu, betraege };
   const zeilen = [
@@ -848,6 +914,7 @@ function kaufKarte(o, umbauen, obenNeu) {
     ...(nk.weitere || []).map((p) => nkZeile(o, p.bezeichnung, p, {
       ...aktionen,
       bezeichnungBearbeitbar: true,
+      sofortSchalter: true,
       entfernen: () => {
         aendern(() => { nk.weitere = nk.weitere.filter((x) => x !== p); });
         umbauen();
@@ -888,7 +955,7 @@ function kaufKarte(o, umbauen, obenNeu) {
   return abschnitt('Kauf & Kaufnebenkosten', 'jede Position wahlweise in % vom Kaufpreis oder als fester Betrag', [
     felderGitter([
       datumFeld('Kaufdatum', o, 'kaufdatum', { nach: obenNeu }),
-      zahlFeld('Kaufpreis', o, 'kaufpreis', { suffix: '€', nach: () => { aufteilung.kaufpreisGeaendert(); werteNeu(); } }),
+      zahlFeld('Kaufpreis', o, 'kaufpreis', { suffix: '€', nach: werteNeu }),
       zahlFeld('Eigenprovision', o, 'eigenprovision', {
         suffix: '€', nach: werteNeu,
         hint: 'mindert die Anschaffungskosten, nicht die Kaufnebenkosten',
@@ -903,6 +970,17 @@ function kaufKarte(o, umbauen, obenNeu) {
         umbauen();
       },
     }, ['+ Weitere Position']),
+    el('button.btn.btn-sm', {
+      type: 'button', style: 'margin-top:12px;margin-left:8px',
+      title: 'Notar und Grundbuch für die Grundschuld – sofort abziehbare Geldbeschaffungskosten',
+      onclick: () => {
+        aendern(() => { nk.weitere = [...(nk.weitere || []), { ...nkPosition('betrag', null, 'Grundschuld: Notar & Grundbuch'), sofort: true }]; });
+        umbauen();
+      },
+    }, ['+ Grundschuld (Notar & Grundbuch)']),
+    el('div.hint', { style: 'margin-top:8px', text: 'Notar & Grundbuch oben meint Kaufvertrag und Eigentumsumschreibung – das sind Anschaffungskosten. '
+      + 'Die Kosten für die Grundschuld stehen meist getrennt auf der Notarrechnung; als eigene Position mit „sofort abziehbar“ '
+      + 'zählen sie als Werbungskosten im Kaufjahr statt über die AfA.' }),
     aufteilung.knoten,
   ]);
 }
@@ -927,9 +1005,12 @@ function steuerKarte(o, obenNeu) {
   const anzeigeNeu = () => {
     const a = afaWerte(o);
     const manuell = o.gebaeudeanteilManuell != null;
+    const auf = anschaffungsAufteilung(o);
     anschaffung.wert.textContent = eur(a.anschaffung);
-    anschaffung.hint.textContent = 'Kaufpreis inkl. Nebenkosten'
-      + (o.eigenprovision ? ', abzgl. Eigenprovision' : '');
+    anschaffung.hint.textContent = 'Gebäude und Grundstück: Kaufpreis inkl. aktivierungspflichtiger Nebenkosten'
+      + (o.eigenprovision ? ', abzgl. Eigenprovision' : '')
+      + (auf.inventar || auf.ruecklage ? ', ohne Inventar und Rücklagenanteil' : '')
+      + (auf.sofort ? `, ohne ${eur(auf.sofort)} sofort abziehbare Kosten` : '');
     grundstueck.wert.textContent = eur(a.grundstueck);
     grundstueck.hint.textContent = manuell
       ? 'Anschaffungskosten − manueller Gebäudeanteil'
@@ -937,10 +1018,11 @@ function steuerKarte(o, obenNeu) {
     bemessung.wert.textContent = eur(a.gebaeude);
     bemessung.hint.textContent = [manuell ? 'manueller Gebäudeanteil' : 'Gebäude + Nebenkosten',
       a.modernisierung ? 'inkl. aktivierter Modernisierung' : null].filter(Boolean).join(' ');
-    proJahr.wert.textContent = eur(a.afaJahr);
-    proJahr.hint.textContent = a.afaDauer
-      ? `über ${num(a.afaDauer, 1)} Jahre ab ${datum(o.kaufdatum)}`
-      : 'keine Abschreibung';
+    proJahr.wert.textContent = eur(a.afaJahr + a.inventarAfaJahr);
+    proJahr.hint.textContent = (a.afaDauer
+      ? `Gebäude über ${num(a.afaDauer, 1)} Jahre ab ${datum(o.kaufdatum)}`
+      : 'keine Gebäude-Abschreibung')
+      + (a.inventarAfaJahr ? ` · davon Inventar ${eur(a.inventarAfaJahr)} über ${a.inventarDauer} Jahre` : '');
   };
   anzeigeNeu();
   const nach = () => { anzeigeNeu(); obenNeu(); };
@@ -978,9 +1060,9 @@ function fristZeile(o) {
           ? 'wird durch den manuellen Gebäudeanteil ersetzt'
           : 'aus der Aufteilung in „Kauf & Kaufnebenkosten“ · gilt auch für die Nebenkosten',
       }),
-      zahlFeld('Gebäudeanteil, manuell', o, 'gebaeudeanteilManuell', {
+      zahlFeld('AfA-Bemessungsgrundlage, manuell', o, 'gebaeudeanteilManuell', {
         suffix: '€', nach,
-        hint: 'leer = aus dem Grundstücksanteil abgeleitet · z. B. aus einem Kaufpreisaufteilungsgutachten',
+        hint: 'nur wenn der Gebäudewert bereits inkl. Nebenkosten feststeht · sonst leer lassen und den Kaufpreis oben aufteilen',
       }),
       zahlFeld('AfA-Satz', o, 'afaSatz', {
         suffix: '%', nachkomma: 3, nach,
