@@ -495,7 +495,12 @@ export function neuesObjekt(einstellungen = STANDARD_EINSTELLUNGEN) {
     energieklasse: '',             // A+ … H laut Energieausweis, '' = nicht angegeben
     mehrereEinheiten: false,
     flaeche: null, zimmer: null,   // bei Einzelobjekten
+    /* Übergang von Nutzen und Lasten: Beginn von Besitz, Miete, Kosten,
+       AfA und der Dreijahresfrist der 15-%-Grenze. */
     kaufdatum: heuteISO(),
+    /* Notarielle Beurkundung des Kaufvertrags: Anschaffung im Sinne des
+       § 23 EStG, Beginn der Spekulationsfrist. Leer = Kaufdatum. */
+    kaufvertragDatum: null,
     kaufpreis: null,
     // Leer = Vorgabe aus den Einstellungen. Gilt je Gemeinde, nicht je Portfolio.
     kappungsgrenzeAbweichend: null,

@@ -32,6 +32,7 @@ import {
 import {
   afaWerte, afaImJahr, anschaffungsnahePruefung, gebaeudeAnschaffung, erhaltungSteuerlich,
   afaGebaeudeImJahr, afaGebaeudeStand, afaInventarImJahr, sofortAbziehbar, sofortAbziehbarePosten, sofortDatum,
+  spekulationsfrist,
 } from './kennzahlen.js';
 
 /* Anlage-V-Zeilen für die beiden neuen Positionen */
@@ -40,7 +41,7 @@ const LABEL_GELDBESCHAFFUNG = 'Werbungskosten: Geldbeschaffungskosten';
 
 // Die 15-%-Pruefung liegt in kennzahlen.js, weil afaWerte() sie braucht –
 // hier nur weitergereicht, damit die Ansichten einen Ort haben.
-export { anschaffungsnahePruefung, gebaeudeAnschaffung, erhaltungSteuerlich };
+export { anschaffungsnahePruefung, gebaeudeAnschaffung, erhaltungSteuerlich, spekulationsfrist };
 
 export { KATEGORIEN, GRUPPEN, artInfo, fahrtBetrag };
 
@@ -301,39 +302,6 @@ export function erhaltungsAmpel(o, stichtag = heuteISO()) {
  * Getrennt von `jahresSummen()`: dort steht der volle Betrag im Jahr des
  * tatsächlichen Zahlungsflusses (Cashflow), hier die steuerliche Verteilung.
  */
-/**
- * Spekulationsfrist nach § 23 EStG – taggenau.
- *
- * Steuerpflichtig ist ein Veraeusserungsgewinn, wenn zwischen Anschaffung
- * und Veraeusserung **nicht mehr als** zehn Jahre liegen. Bei Anschaffung am
- * 15.04.2016 ist der Verkauf am 15.04.2026 also noch steuerpflichtig und
- * erst ab dem 16.04.2026 frei – daher der Tag Zuschlag.
- *
- * ACHTUNG, bewusste Ungenauigkeit: Massgeblich sind die **obligatorischen
- * Geschaefte**, also das Datum des Kaufvertrags. `o.kaufdatum` dient in
- * dieser App dem AfA-Beginn und `besitzMonate()` und meint damit eher den
- * Uebergang von Nutzen und Lasten. Beides kann Monate auseinanderliegen.
- * Die Oberflaeche sagt das dazu, statt Genauigkeit vorzutaeuschen.
- *
- * Die Verkaufsrechnung im Forecast rechnet weiterhin jahresgenau
- * (`verkaufRechnen()`): Sie ist ein Modell in Jahresschritten, waehrend hier
- * ein konkretes Datum genannt wird. Beide duerfen unterschiedlich genau sein.
- */
-export function spekulationsfrist(o, stichtag = heuteISO()) {
-  if (!o?.kaufdatum) return null;
-  /* datumPlus() erwartet ein Date, kein ISO-Datum – und die Zerlegung in
-     Jahr/Monat/Tag vermeidet die Zeitzonenverschiebung, die new Date(string)
-     mitbraechte. Dasselbe Muster wie in erhaltungsAmpel() oben. */
-  const [j, m, t] = o.kaufdatum.split('-').map(Number);
-  const zehnJahre = datumPlus({ jahre: 10 }, new Date(j, (m || 1) - 1, t || 1));
-  const [j2, m2, t2] = zehnJahre.split('-').map(Number);
-  const steuerfreiAb = datumPlus({ tage: 1 }, new Date(j2, m2 - 1, t2));
-  const steuerfrei = stichtag >= steuerfreiAb;
-  const tageRest = steuerfrei ? 0
-    : Math.round((new Date(steuerfreiAb) - new Date(stichtag)) / 86400000);
-  return { steuerfreiAb, steuerfrei, tageRest };
-}
-
 /**
  * Erhaltungsaufwand, der nach § 82b EStDV noch auf kuenftige Jahre
  * verteilt ist – je Buchung der Restbetrag und das letzte Jahr.

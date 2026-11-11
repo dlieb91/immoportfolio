@@ -454,6 +454,37 @@ export function mieteImJahr(objektId, jahr) {
   return { kalt, nk, monate, einheiten: einheiten.length, moeglich: einheiten.length * 12 };
 }
 
+/* ---------- Spekulationsfrist ---------- */
+
+/**
+ * Spekulationsfrist nach § 23 EStG – taggenau.
+ *
+ * Steuerpflichtig ist ein Veräußerungsgewinn, wenn zwischen Anschaffung und
+ * Veräußerung **nicht mehr als** zehn Jahre liegen. Maßgeblich sind die
+ * obligatorischen Geschäfte, also die **notarielle Beurkundung** des
+ * Kaufvertrags (`kaufvertragDatum`), nicht der Übergang von Nutzen und
+ * Lasten (`kaufdatum`). Ohne Beurkundungsdatum rechnet die Frist ersatzweise
+ * ab dem Kaufdatum – `ausVertrag` sagt, welches gilt.
+ *
+ * Bei Beurkundung am 15.04.2016 ist ein Verkauf am 15.04.2026 noch
+ * steuerpflichtig und erst ab dem 16.04.2026 frei – daher der Tag Zuschlag.
+ * Für den Verkauf zählt ebenfalls das Datum des Verkaufsvertrags.
+ */
+export function spekulationsfrist(o, stichtag = heuteISO()) {
+  const basis = o?.kaufvertragDatum || o?.kaufdatum;
+  if (!basis) return null;
+  /* datumPlus() erwartet ein Date, kein ISO-Datum – die Zerlegung in
+     Jahr/Monat/Tag vermeidet die Zeitzonenverschiebung von new Date(string). */
+  const [j, m, t] = basis.split('-').map(Number);
+  const zehnJahre = datumPlus({ jahre: 10 }, new Date(j, (m || 1) - 1, t || 1));
+  const [j2, m2, t2] = zehnJahre.split('-').map(Number);
+  const steuerfreiAb = datumPlus({ tage: 1 }, new Date(j2, m2 - 1, t2));
+  const steuerfrei = stichtag >= steuerfreiAb;
+  const tageRest = steuerfrei ? 0
+    : Math.round((new Date(steuerfreiAb) - new Date(stichtag)) / 86400000);
+  return { steuerfreiAb, steuerfrei, tageRest, basis, ausVertrag: !!o.kaufvertragDatum };
+}
+
 /* ---------- Objekt ---------- */
 
 /**

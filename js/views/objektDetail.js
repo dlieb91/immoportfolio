@@ -1021,16 +1021,33 @@ function kaufKarte(o, umbauen, obenNeu) {
       })
     : null;
 
+  /* Beurkundung nach dem Lastenübergang ist fast immer ein Tippfehler. */
+  const reihenfolgeHinweis = el('div.hint', { style: 'margin-top:6px;color:var(--warn)' });
+  const reihenfolge = () => {
+    reihenfolgeHinweis.textContent = o.kaufvertragDatum && o.kaufdatum && o.kaufvertragDatum > o.kaufdatum
+      ? 'Die Beurkundung liegt nach dem Übergang von Nutzen und Lasten – bitte die beiden Daten prüfen.'
+      : '';
+  };
+  reihenfolge();
+
   anzeigeNeu();   // Startwerte in Fußzeile und Betragsspalte
   return abschnitt('Kauf & Kaufnebenkosten', 'jede Position wahlweise in % vom Kaufpreis oder als fester Betrag', [
     felderGitter([
-      datumFeld('Kaufdatum', o, 'kaufdatum', { nach: obenNeu }),
+      datumFeld('Notarielle Beurkundung', o, 'kaufvertragDatum', {
+        nach: () => { reihenfolge(); obenNeu(); },
+        hint: 'Datum des Kaufvertrags · Beginn der Spekulationsfrist (§ 23 EStG)',
+      }),
+      datumFeld('Übergang Nutzen und Lasten', o, 'kaufdatum', {
+        nach: () => { reihenfolge(); obenNeu(); },
+        hint: 'Kaufdatum der App · Beginn von Miete, Kosten, AfA und 15-%-Frist',
+      }),
       zahlFeld('Kaufpreis', o, 'kaufpreis', { suffix: '€', nach: werteNeu }),
       zahlFeld('Eigenprovision', o, 'eigenprovision', {
         suffix: '€', nach: werteNeu,
         hint: 'mindert die Anschaffungskosten, nicht die Kaufnebenkosten',
       }),
     ]),
+    reihenfolgeHinweis,
     el('div', { style: 'margin-top:8px' }, [tabelle]),
     grestHinweis,
     el('button.btn.btn-sm', {
@@ -1095,9 +1112,9 @@ function steuerKarte(o, obenNeu) {
  * Spekulationsfrist im Klartext. Steht dauerhaft in der Karte, nicht nur als
  * Warnung kurz vor Ablauf – wer ein Objekt ansieht, will das Datum wissen.
  *
- * Der Hinweis auf das Vertragsdatum ist kein Beiwerk: Massgeblich ist nach
- * § 23 EStG das obligatorische Geschaeft, waehrend `kaufdatum` hier den
- * Lastenuebergang meint. Beides kann Monate auseinanderliegen.
+ * Maßgeblich ist nach § 23 EStG das obligatorische Geschäft, also die
+ * notarielle Beurkundung (`kaufvertragDatum`). Fehlt sie, rechnet die Frist
+ * ab dem Übergang von Nutzen und Lasten – das sagt der Hinweis dann dazu.
  */
 function fristZeile(o) {
   const f = spekulationsfrist(o);
@@ -1109,11 +1126,14 @@ function fristZeile(o) {
         ? el('span.badge.gruen', { text: 'abgelaufen – Verkauf steuerfrei' })
         : el('span.num', { style: 'font-weight:600', text: `steuerfrei ab ${datum(f.steuerfreiAb)}` }),
     ]),
-    el('div.hint', { style: 'margin-top:4px', text: f.steuerfrei
-      ? 'Ein Veräußerungsgewinn ist nicht mehr zu versteuern.'
-      : `Noch ${f.tageRest} Tage. Bis dahin ist ein Veräußerungsgewinn voll zu versteuern. `
-        + 'Gerechnet ab dem Kaufdatum – maßgeblich ist das Datum des Kaufvertrags, '
-        + 'nicht der Übergang von Nutzen und Lasten. Weichen beide ab, bitte selbst nachrechnen.' }),
+    el('div.hint', { style: 'margin-top:4px', text: (f.steuerfrei
+      ? 'Ein Veräußerungsgewinn ist nicht mehr zu versteuern. '
+      : `Noch ${f.tageRest} Tage. Bis dahin ist ein Veräußerungsgewinn voll zu versteuern; `
+        + 'maßgeblich ist das Datum des Verkaufsvertrags. ')
+      + (f.ausVertrag
+        ? `Gerechnet ab der notariellen Beurkundung am ${datum(f.basis)}.`
+        : 'Gerechnet ab dem Übergang von Nutzen und Lasten, weil keine notarielle Beurkundung erfasst ist – '
+          + 'maßgeblich ist das Datum des Kaufvertrags. Bitte in „Kauf & Kaufnebenkosten“ eintragen.') }),
   ]);
 }
 

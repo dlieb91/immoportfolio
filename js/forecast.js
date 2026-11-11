@@ -24,7 +24,7 @@ import {
 import {
   tilgungsplan, restschuldZu, ersatzGuthabenZu, ersatzEingezahltBis,
 } from './finanzmathematik.js';
-import { afaImJahr, afaWerte, eingesetztesKapital, sofortAbziehbar } from './kennzahlen.js';
+import { afaImJahr, afaWerte, eingesetztesKapital, sofortAbziehbar, spekulationsfrist } from './kennzahlen.js';
 import { kostenJahr } from './betriebskosten.js';
 
 export const SZENARIEN = [
@@ -277,9 +277,10 @@ export function prognose(params, stichtag = heuteISO(), objektIds = null) {
 /* ---------- Verkaufsszenario ---------- */
 
 /**
- * Verkauf aller Objekte im angegebenen Jahr.
+ * Verkauf aller Objekte im angegebenen Jahr, angenommen zum Jahresende.
  * Innerhalb der zehnjährigen Spekulationsfrist ist der Gewinn zu versteuern;
  * Bemessungsgrundlage ist der Buchwert nach bereits geltend gemachter AfA.
+ * Die Frist rechnet ab der notariellen Beurkundung, siehe spekulationsfrist().
  */
 function verkaufRechnen(verkaufsJahr, jahre, params, startJahr) {
   const zeile = jahre.find((z) => z.jahr === verkaufsJahr);
@@ -304,8 +305,10 @@ function verkaufRechnen(verkaufsJahr, jahre, params, startJahr) {
     const anschaffung = a.gebaeude + a.grundstueck + a.inventar;
     const buchwert = Math.max(0, anschaffung - kumAfa);
 
-    const haltedauer = verkaufsJahr - kaufjahr;
-    const steuerpflichtig = haltedauer < 10;
+    const vertragsjahr = Number(String(o.kaufvertragDatum || o.kaufdatum || startJahr).slice(0, 4));
+    const haltedauer = verkaufsJahr - vertragsjahr;
+    const frist = spekulationsfrist(o, `${verkaufsJahr}-12-31`);
+    const steuerpflichtig = frist ? !frist.steuerfrei : haltedauer < 10;
     const gewinn = netto - buchwert;
     const objSteuer = steuerpflichtig && gewinn > 0 ? gewinn * steuersatzFuer(o, params) / 100 : 0;
 

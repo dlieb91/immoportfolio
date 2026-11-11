@@ -302,6 +302,7 @@ werden bewusst nicht verglichen; die laufen auf zwei Geräten ohnehin auseinande
 | 32 | Notarkosten in Einzelpositionen, Grundschuldbestellung nach Darlehenssumme sofort abziehbar | fertig |
 | 33 | Kaufnebenkosten: bezahlt mit Zahldatum, sofort abziehbare Positionen im Jahr der Zahlung | fertig |
 | 34 | Miete erst ab Kaufmonat; aktivierte Modernisierung erst ab dem Jahr der Maßnahme abgeschrieben | fertig |
+| 35 | Notarielle Beurkundung getrennt vom Übergang von Nutzen und Lasten; Spekulationsfrist ab Beurkundung | fertig |
 
 ## Aufbau des Codes
 
@@ -607,8 +608,9 @@ gespeichert – jede Änderung rechnet sofort neu. Modell je Jahr:
 - **Finanzierung** kommt aus dem Tilgungsplan, nach Ablauf der Zinsbindung mit dem
   Anschlusszins des jeweiligen Szenarios.
 - **AfA** endet, sobald das Gebäude abgeschrieben ist (bei 2 % nach 50 Jahren ab Kauf).
-- **Verkauf** ist optional. Innerhalb der zehnjährigen Spekulationsfrist wird der Gewinn
-  versteuert; Bemessungsgrundlage ist der Buchwert nach bereits geltend gemachter AfA.
+- **Verkauf** ist optional, angenommen zum Ende des Verkaufsjahres. Innerhalb der zehnjährigen
+  Spekulationsfrist (ab der notariellen Beurkundung) wird der Gewinn versteuert;
+  Bemessungsgrundlage ist der Buchwert nach bereits geltend gemachter AfA.
 
 Die Randszenarien leiten sich aus den Basisannahmen ab: *pessimistisch* −1 Punkt
 Mietsteigerung, −2 Wertsteigerung, +3 Leerstand, +1,5 Anschlusszins, +0,5 Instandhaltung;
@@ -813,10 +815,16 @@ Der Anhang beginnt beim Drucken auf einer neuen Seite und lässt sich so getrenn
 - **Die 10-Tage-Regel des § 11 EStG** (regelmäßig wiederkehrende Zahlungen kurz vor oder
   nach dem Jahreswechsel gelten für das Jahr, zu dem sie wirtschaftlich gehören) wendet die
   App **nicht automatisch** an – gebucht wird nach dem eingetragenen Datum.
-- **Die Spekulationsfrist rechnet ab `kaufdatum`.** Maßgeblich ist nach § 23 EStG das
-  Datum des **Kaufvertrags**; das Feld dient in der App zugleich dem AfA-Beginn und meint
-  damit eher den Übergang von Nutzen und Lasten. Weichen beide ab, ist die angezeigte
-  Frist eine Orientierung und kein Freibrief.
+- **Zwei Kaufdaten.** In *Kauf & Kaufnebenkosten* stehen getrennt die **notarielle
+  Beurkundung** (Datum des Kaufvertrags) und der **Übergang von Nutzen und Lasten**.
+  - Die Beurkundung ist die Anschaffung im Sinne des § 23 EStG: Ab ihr läuft die zehnjährige
+    **Spekulationsfrist**, taggenau – bei Beurkundung am 15.04.2016 ist ein Verkauf ab dem
+    16.04.2026 steuerfrei. Für den Verkauf zählt ebenso das Datum des Verkaufsvertrags.
+  - Der Übergang von Nutzen und Lasten ist das *Kaufdatum* der App: Ab ihm zählen Miete,
+    Kosten, AfA (zeitanteilig ab diesem Monat) und die Dreijahresfrist der 15-%-Grenze.
+  - Ohne Beurkundungsdatum rechnet die Frist ersatzweise ab dem Übergang und sagt das dazu.
+    Liegt die Beurkundung nach dem Übergang, weist die Karte auf einen vermutlichen
+    Tippfehler hin.
 - **Ein Verkauf vor Ablauf einer § 82b-Verteilung** lässt den Restbetrag in einer Summe
   abziehbar werden. Die App kennt keinen Verkaufsvorgang und rechnet das nicht.
 
