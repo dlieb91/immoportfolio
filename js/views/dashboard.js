@@ -1,7 +1,7 @@
 /* Dashboard: Portfolio auf einen Blick – Vermögen, Cashflow, Rendite, Warnungen. */
 
 import { el, eur, num, datum, heuteISO, datumPlus } from '../util.js';
-import { state, vertragStatus, einheitenVon, einheitName } from '../store.js';
+import { state, vertragStatus, einheitenVon, einheitName, vertraegeVorUebergang } from '../store.js';
 import {
   portfolioKennzahlen, steuerModus, cashflowAktuell, kapitalbindungPortfolio,
 } from '../kennzahlen.js';
@@ -405,6 +405,18 @@ function warnungen() {
       text: (ampel.stufe === 'rot' ? 'Über der 15-%-Grenze: ' : 'Nähert sich der 15-%-Grenze: ')
         + (o.bezeichnung || 'Objekt'),
       detail: `Erhaltungsaufwand seit dem Kauf ${eur(ampel.summe, 0)} von ${eur(ampel.grenze, 0)}`,
+    });
+  }
+
+  /* Mietbeginn vor dem Übergang von Nutzen und Lasten: Die Miete zählt
+     erst ab dem Übergang – ein Hinweis, falls das Datum vertippt ist. */
+  const vorUebergang = vertraegeVorUebergang();
+  if (vorUebergang.length) {
+    punkte.push({
+      art: 'warn', ziel: `#/mietvertrag?id=${vorUebergang[0].mv.id}`,
+      text: `${vorUebergang.length === 1 ? 'Ein Mietvertrag beginnt' : vorUebergang.length + ' Mietverträge beginnen'} vor dem Übergang von Nutzen und Lasten`,
+      detail: vorUebergang.slice(0, 3).map((x) => `${x.mv.mieter || 'ohne Mieter'} (${x.o.bezeichnung || 'Objekt'}, Übergang ${datum(x.o.kaufdatum)})`).join(', ')
+        + ' · Miete zählt erst ab dem Übergang',
     });
   }
 

@@ -23,7 +23,7 @@ import { heuteISO, datumPlus } from './util.js';
 import {
   state, objekt as objektMit, einheitMit, einheitName, objektVonEinheit,
   flaecheVon, einheitenVon, mieteEinheit, buchungenVon, fahrtenVon,
-  besitzMonate, aktiveVertraege, mieteVon, imBestandIm,
+  besitzMonate, aktiveVertraege, mieteVon, mieteMoeglichIm,
 } from './store.js';
 import { kostenJahr } from './betriebskosten.js';
 import {
@@ -145,7 +145,7 @@ export function nkAbrechnung(einheitId, jahr) {
   const vertraege = [];
   for (let m = 1; m <= 12; m++) {
     // Vor dem Kauf rechnet der Verkäufer ab, nicht du
-    if (!imBestandIm(o, `${jahr}-${String(m).padStart(2, '0')}`)) continue;
+    if (!mieteMoeglichIm(o, `${jahr}-${String(m).padStart(2, '0')}`)) continue;
     const stichtag = `${jahr}-${String(m).padStart(2, '0')}-15`;
     const w = mieteEinheit(einheitId, stichtag);
     if (w.nk) vorauszahlung += w.nk;

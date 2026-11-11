@@ -4,12 +4,20 @@ import { el, leeren, eur, num, datum, heuteISO, toast, modal } from '../util.js'
 import {
   state, aendern, neuerMietvertrag, einheitenVon, einheitMit, einheitName,
   objektVonEinheit, vertragStatus, vertragsEnde, aktuelleKondition,
-  naechsteAnpassung, mieteVon, einheitSicherstellen,
+  naechsteAnpassung, mieteVon, einheitSicherstellen, ersterMietmonat,
 } from '../store.js';
 import { parseZahl } from '../felder.js';
 
 export const STATUS_TEXT = { aktiv: 'aktiv', zukuenftig: 'künftig', beendet: 'beendet' };
 export const STATUS_KLASSE = { aktiv: 'gruen', zukuenftig: 'blau', beendet: 'grau' };
+
+/** Warnung, wenn der Vertrag vor dem Übergang von Nutzen und Lasten beginnt. */
+export function uebergangsWarnung(o, beginn) {
+  if (!o?.kaufdatum || !beginn || beginn >= o.kaufdatum) return '';
+  const [j, m] = ersterMietmonat(o).split('-');
+  return `Der Mietbeginn liegt vor dem Übergang von Nutzen und Lasten (${datum(o.kaufdatum)}). `
+    + `Miete fällt für dich erst ab ${m}/${j} an – davor steht sie dem Verkäufer zu.`;
+}
 
 /** Tage bis zum Vertragsende, null wenn unbefristet. */
 export function tageBisEnde(mv, stichtag = heuteISO()) {
@@ -268,11 +276,24 @@ export async function anlegen(einheitIdVorgabe, danach, objektIdFilter) {
     }));
   }
 
+  /* Warnung, sobald der Beginn vor dem Übergang von Nutzen und Lasten liegt */
+  const warnung = el('div.hint', { style: 'color:var(--warn);margin-top:4px' });
+  const gewaehltesObjekt = () => {
+    if (einheitIdVorgabe) return objektVonEinheit(einheitIdVorgabe);
+    if (!auswahl) return null;
+    const [art, id] = auswahl.value.split(':');
+    return art === 'e' ? objektVonEinheit(id) : d.objekte.find((o) => o.id === id);
+  };
+  const warnungNeu = () => { warnung.textContent = uebergangsWarnung(gewaehltesObjekt(), beginn.value); };
+  beginn.addEventListener('change', warnungNeu);
+  auswahl?.addEventListener('change', warnungNeu);
+  warnungNeu();
+
   const inhalt = el('div', {}, [
     auswahl ? el('div.field', {}, [el('label', { text: 'Objekt / Einheit' }), auswahl]) : null,
     el('div.field', {}, [el('label', { text: 'Mieter' }), mieter]),
     el('div', { style: 'display:grid;grid-template-columns:1fr 1fr;gap:0 14px' }, [
-      el('div.field', {}, [el('label', { text: 'Mietbeginn' }), beginn]),
+      el('div.field', {}, [el('label', { text: 'Mietbeginn' }), beginn, warnung]),
       el('div.field', {}, [
         el('label', { text: 'Kaltmiete' }),
         el('div.input-suffix', {}, [kaltmiete, el('span', { text: '€' })]),

@@ -6,7 +6,7 @@ import {
   einheitenVon, mietvertraegeZuObjekt, finanzierungenVon, GRUNDERWERBSTEUER,
   neueEinheit, einheitName, einheitSicherstellen, mieteEinheit, mieteVon,
   mieteObjekt, vertragStatus, vertragsEnde, verkehrswert, hauptbild,
-  neueBuchung, neueFahrt, buchungenVon, fahrtenVon, aktuelleKondition,
+  neueBuchung, neueFahrt, buchungenVon, fahrtenVon, aktuelleKondition, vertraegeVorUebergang,
 } from '../store.js';
 import { bildURL, bildSpeichern, bildLoeschen } from '../storage.js';
 import {
@@ -1024,9 +1024,15 @@ function kaufKarte(o, umbauen, obenNeu) {
   /* Beurkundung nach dem Lastenübergang ist fast immer ein Tippfehler. */
   const reihenfolgeHinweis = el('div.hint', { style: 'margin-top:6px;color:var(--warn)' });
   const reihenfolge = () => {
-    reihenfolgeHinweis.textContent = o.kaufvertragDatum && o.kaufdatum && o.kaufvertragDatum > o.kaufdatum
-      ? 'Die Beurkundung liegt nach dem Übergang von Nutzen und Lasten – bitte die beiden Daten prüfen.'
-      : '';
+    const vor = vertraegeVorUebergang(o.id);
+    reihenfolgeHinweis.textContent = [
+      o.kaufvertragDatum && o.kaufdatum && o.kaufvertragDatum > o.kaufdatum
+        ? 'Die Beurkundung liegt nach dem Übergang von Nutzen und Lasten – bitte die beiden Daten prüfen.' : '',
+      vor.length
+        ? `${vor.length === 1 ? 'Ein Mietvertrag beginnt' : vor.length + ' Mietverträge beginnen'} vor dem Übergang von Nutzen und Lasten `
+          + `(${vor.map((x) => x.mv.mieter || 'ohne Mieter').join(', ')}). Miete zählt erst ab dem Übergang – `
+          + 'ab dem Monat, an dessen 15. du Eigentümer bist.' : '',
+    ].filter(Boolean).join(' ');
   };
   reihenfolge();
 

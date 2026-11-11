@@ -21,7 +21,7 @@ import { uid, heuteISO } from './util.js';
 import { monatsSummen } from './betriebskosten.js';
 import {
   state, einheitenVon, finanzierungenVon, aktiveVertraege, mieteVon,
-  objekt as objektMit, einheitMit, einheitName, besitzMonate, darlehenPlan, imBestandIm, kaltmieteAnteil,
+  objekt as objektMit, einheitMit, einheitName, besitzMonate, darlehenPlan, imBestandIm, kaltmieteAnteil, mieteMoeglichIm,
   datenRevision,
 } from './store.js';
 
@@ -184,10 +184,11 @@ export function monatszahlungen(o, jahr, monat) {
     });
   };
 
-  /* Miete und Nebenkosten je laufendem Vertrag – erst ab dem Kaufmonat.
-     Ein übernommener Vertrag beginnt oft Jahre vor dem Kauf; die Miete
-     davor stand dem Verkäufer zu, nicht dir. */
-  for (const e of imBestand ? einheitenVon(o.id) : []) {
+  /* Miete und Nebenkosten je laufendem Vertrag – erst nach dem Übergang von
+     Nutzen und Lasten (am 15. des Monats Eigentümer). Ein übernommener
+     Vertrag beginnt oft Jahre vor dem Kauf; die Miete davor stand dem
+     Verkäufer zu, nicht dir. */
+  for (const e of imBestand && mieteMoeglichIm(o, p) ? einheitenVon(o.id) : []) {
     for (const mv of aktiveVertraege(e.id, stichtag)) {
       const m = mieteVon(mv, stichtag);
       const name = (einheitenVon(o.id).length > 1 ? einheitName(e) + ' · ' : '') + (mv.mieter || 'Ohne Mieter');

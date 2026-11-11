@@ -746,6 +746,38 @@ export function imBestandIm(o, periode) {
   return !o?.kaufdatum || periode >= o.kaufdatum.slice(0, 7);
 }
 
+/**
+ * Kann im Monat `periode` ('JJJJ-MM') Miete anfallen? Erst wenn Nutzen und
+ * Lasten übergegangen sind – maßgeblich ist wie beim Mietvertrag der 15.:
+ * Wer am 15. Eigentümer ist, bekommt die Miete dieses Monats. Davor steht sie
+ * dem Verkäufer zu.
+ */
+export function mieteMoeglichIm(o, periode) {
+  return !o?.kaufdatum || o.kaufdatum <= `${periode}-15`;
+}
+
+/**
+ * Mietverträge, die vor dem Übergang von Nutzen und Lasten beginnen – für
+ * die Warnung. Die Miete zählt bei ihnen erst ab mieteMoeglichIm().
+ */
+export function vertraegeVorUebergang(objektId = null) {
+  const raus = [];
+  for (const mv of state.daten.mietvertraege || []) {
+    const o = objektVonEinheit(mv.einheitId);
+    if (!o || (objektId && o.id !== objektId)) continue;
+    if (o.kaufdatum && mv.beginn && mv.beginn < o.kaufdatum) raus.push({ mv, o });
+  }
+  return raus;
+}
+
+/** Erster Monat ('JJJJ-MM'), in dem Miete anfallen kann. */
+export function ersterMietmonat(o) {
+  if (!o?.kaufdatum) return null;
+  const [j, m, t] = o.kaufdatum.split('-').map(Number);
+  if (t <= 15) return o.kaufdatum.slice(0, 7);
+  return m === 12 ? `${j + 1}-01` : `${j}-${String(m + 1).padStart(2, '0')}`;
+}
+
 /* ---------- Tilgungsplaene mit Zwischenspeicher ---------- */
 
 let planRevision = -1;

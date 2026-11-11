@@ -10,7 +10,7 @@ import {
   textFeld, zahlFeld, datumFeld, auswahlFeld, schalterFeld, textBereich,
   felderGitter, abschnitt, parseZahl, tabellenDatum, tabellenZahl, tabellenText,
 } from '../felder.js';
-import { STATUS_TEXT, STATUS_KLASSE, tageBisEnde } from './mietvertraege.js';
+import { STATUS_TEXT, STATUS_KLASSE, tageBisEnde, uebergangsWarnung } from './mietvertraege.js';
 import {
   mieterhoehungsPotenzial, staffelVorschau, indexAnpassung, anpassungHinweis,
   STAFFEL_MINDEST_MONATE,
@@ -164,9 +164,15 @@ function zuordnung(mv, allesNeu) {
 /* ---------- Laufzeit ---------- */
 
 function laufzeit(mv, neuRechnen, neuAufbauen) {
+  const o = objektVonEinheit(mv.einheitId);
+  const warnung = el('div.hint', { style: 'color:var(--warn);margin-top:4px' });
+  const warnungNeu = () => { warnung.textContent = uebergangsWarnung(o, mv.beginn); };
+  warnungNeu();
+  const beginnFeld = datumFeld('Mietbeginn', mv, 'beginn', { nach: () => { warnungNeu(); neuRechnen(); } });
+  beginnFeld.append(warnung);
   const felder = [
     textFeld('Mieter', mv, 'mieter', { nach: neuRechnen }),
-    datumFeld('Mietbeginn', mv, 'beginn', { nach: neuRechnen }),
+    beginnFeld,
   ];
 
   if (!mv.unbefristet) {
