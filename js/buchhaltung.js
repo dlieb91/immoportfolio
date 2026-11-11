@@ -432,8 +432,8 @@ export function werbungskostenHerleitung(o, jahr) {
 
   /* --- Geldbeschaffungskosten des Kaufs: sofort im Kaufjahr --- */
   if (sofortAbziehbar(o, jahr)) {
-    const posten = nebenkostenBerechnen(o).weitere.filter((p) => p.sofort && p.betrag)
-      .map((p) => ({ text: p.bezeichnung || 'Kaufnebenkosten', betrag: p.betrag, datum: o.kaufdatum, hinweis: 'sofort abziehbar, kein Teil der Anschaffungskosten' }));
+    const posten = nebenkostenBerechnen(o).sofortPosten
+      .map((p) => ({ ...p, datum: o.kaufdatum, hinweis: 'sofort abziehbar, kein Teil der Anschaffungskosten' }));
     raus.push({
       label: LABEL_GELDBESCHAFFUNG, art: 'geldbeschaffung', posten,
       betrag: -posten.reduce((s, x) => s + x.betrag, 0),

@@ -97,12 +97,15 @@ export const einstellungen = {
       'nur Startwerte beim Anlegen eines neuen Objekts',
       [
         zahlFeld('Grunderwerbsteuer', e, 'grunderwerbsteuer', { suffix: '%', nachkomma: 2 }),
-        zahlFeld('Notar & Grundbuch', e, 'notarkosten', { suffix: '%', nachkomma: 2 }),
+        zahlFeld('Notar Kaufvertrag', e, 'notarkosten', { suffix: '%', nachkomma: 2, hint: 'vom Kaufpreis' }),
+        zahlFeld('Grundbuch Eigentumsumschreibung', e, 'grundbuchkosten', { suffix: '%', nachkomma: 2, hint: 'vom Kaufpreis' }),
+        zahlFeld('Grundschuldbestellung', e, 'grundschuldkosten', { suffix: '%', nachkomma: 2, hint: 'Notar und Grundbuch, von der Darlehenssumme · sofort abziehbar' }),
         zahlFeld('Maklerprovision', e, 'maklerProvision', { suffix: '%', nachkomma: 2 }),
       ],
       '<strong>Die Kaufnebenkosten werden je Objekt erfasst.</strong> Diese Werte füllen beim Anlegen '
       + 'nur das Formular vor und lassen sich dort für jedes Objekt einzeln ändern – wahlweise als Prozentsatz '
-      + 'vom Kaufpreis oder als fester Betrag, ergänzt um beliebige eigene Positionen.'
+      + 'vom Kaufpreis oder als fester Betrag, ergänzt um beliebige eigene Positionen. '
+      + 'Die Werte sind Erfahrungswerte – maßgeblich sind die Rechnungen von Notar und Grundbuchamt.'
     ));
 
     inner.append(abschnitt('Forecast-Vorgaben', 'Startwerte der Prognose – im Forecast jederzeit veränderbar', [

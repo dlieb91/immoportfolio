@@ -10,7 +10,7 @@ import { planeSpeichern } from './storage.js';
 import { tilgungsplan } from './finanzmathematik.js';
 import { ausSammelfeldern } from './betriebskosten.js';
 
-export const SCHEMA_VERSION = 15;
+export const SCHEMA_VERSION = 16;
 
 export const STANDARD_EINSTELLUNGEN = {
   // Steuern
@@ -38,7 +38,12 @@ export const STANDARD_EINSTELLUNGEN = {
   verkaufskosten: 3.0,        // % vom Verkaufserlös
   // Nur Vorbelegung beim Anlegen eines Objekts – erfasst wird je Objekt.
   grunderwerbsteuer: 6.5,
-  notarkosten: 1.5,
+  /* Erfahrungswerte, maßgeblich sind die Rechnungen. Notar und Grundbuch
+     für den Kauf sind Anschaffungskosten; die Grundschuldbestellung richtet
+     sich nach der Darlehenssumme und ist sofort abziehbar. */
+  notarkosten: 1.0,           // Notar Kaufvertrag, % vom Kaufpreis
+  grundbuchkosten: 0.5,       // Grundbuch Eigentumsumschreibung, % vom Kaufpreis
+  grundschuldkosten: 0.4,     // Notar und Grundbuch Grundschuld, % der Darlehenssumme
   maklerProvision: 3.57,
   // Fahrtkosten zum Objekt – BFH IX R 18/15: im Regelfall die vollen Kosten,
   // hier vereinfacht ueber die Pauschale. fahrtModus 'reise' rechnet die
@@ -343,6 +348,34 @@ export function migrieren(daten) {
     }
     daten.schemaVersion = 15;
   }
+  if (v < 16) {
+    /* Notarkosten in Einzelpositionen. Der bisherige Wert bleibt als „Notar
+       Kaufvertrag“ stehen – welcher Teil davon Grundbuch oder Grundschuld
+       war, weiß die App nicht; die Karte bittet um Aufteilung. Eine frei
+       angelegte, sofort abziehbare Grundschuld-Position wandert in die neue
+       feste Position. Bestehende Portfolios bekommen keine geschätzten
+       Vorgaben für Grundbuch und Grundschuld, sonst zählte die alte
+       Sammel-Vorgabe für Notar & Grundbuch bei neuen Objekten doppelt. */
+    for (const o of daten.objekte || []) {
+      const nk = o.nebenkosten;
+      if (!nk) continue;
+      if (!nk.grundbuch) nk.grundbuch = nkPosition('prozent', null);
+      if (!nk.grundschuld) {
+        const alt = (nk.weitere || []).filter((x) => x.sofort && /grundschuld/i.test(x.bezeichnung || ''));
+        if (alt.length === 1 && alt[0].wert != null) {
+          nk.grundschuld = alt[0].modus === 'betrag' ? nkPosition('betrag', alt[0].wert) : nkPosition('prozent', null);
+          if (alt[0].modus === 'betrag') nk.weitere = nk.weitere.filter((x) => x !== alt[0]);
+        } else {
+          nk.grundschuld = nkPosition('prozent', null);
+        }
+      }
+    }
+    if (daten.einstellungen) {
+      if (!('grundbuchkosten' in daten.einstellungen)) daten.einstellungen.grundbuchkosten = null;
+      if (!('grundschuldkosten' in daten.einstellungen)) daten.einstellungen.grundschuldkosten = null;
+    }
+    daten.schemaVersion = 16;
+  }
 
   const basis = neuesPortfolio(daten.meta?.name);
   const zusammen = {
@@ -395,23 +428,38 @@ export function nebenkostenBerechnen(obj) {
   const kp = obj.kaufpreis || 0;
   const nk = obj.nebenkosten || {};
   const weitere = (nk.weitere || []).map((p) => ({ ...p, betrag: nkBetrag(p, kp) }));
+  /* Die Grundschuldbestellung richtet sich nach der Darlehenssumme, nicht
+     nach dem Kaufpreis: Prozent beziehen sich hier auf die Summe der
+     Darlehen des Objekts. */
+  const darlehenssumme = obj.id
+    ? (state.daten?.finanzierungen || []).filter((f) => f.objektId === obj.id).reduce((s, f) => s + (f.betrag || 0), 0)
+    : 0;
   const posten = {
     grunderwerbsteuer: nkBetrag(nk.grunderwerbsteuer, kp),
     notar: nkBetrag(nk.notar, kp),
+    grundbuch: nkBetrag(nk.grundbuch, kp),
+    grundschuld: nkBetrag(nk.grundschuld, darlehenssumme),
     makler: nkBetrag(nk.makler, kp),
   };
-  const summe = posten.grunderwerbsteuer + posten.notar + posten.makler
+  const summe = posten.grunderwerbsteuer + posten.notar + posten.grundbuch + posten.grundschuld + posten.makler
     + weitere.reduce((s, p) => s + p.betrag, 0);
   /* Sofort abziehbar sind Kosten der Finanzierung, nicht des Erwerbs –
-     typisch Notar und Grundbuch für die Grundschuld (Geldbeschaffungskosten).
-     Sie gehören zur Gesamtinvestition, nicht zu den Anschaffungskosten. */
-  const sofort = weitere.filter((p) => p.sofort).reduce((s, p) => s + p.betrag, 0);
+     die Grundschuldbestellung und frei angelegte Positionen mit dem Haken
+     „sofort abziehbar“ (Geldbeschaffungskosten). Sie gehören zur
+     Gesamtinvestition, nicht zu den Anschaffungskosten. */
+  const sofortPosten = [
+    ...(posten.grundschuld ? [{ text: 'Grundschuldbestellung (Notar & Grundbuch)', betrag: posten.grundschuld }] : []),
+    ...weitere.filter((p) => p.sofort && p.betrag).map((p) => ({ text: p.bezeichnung || 'Kaufnebenkosten', betrag: p.betrag })),
+  ];
+  const sofort = sofortPosten.reduce((s, p) => s + p.betrag, 0);
   const eigenprovision = obj.eigenprovision || 0;
   return {
     ...posten,
     weitere,
     summe,
     sofort,
+    sofortPosten,
+    darlehenssumme,
     eigenprovision,
     quote: kp ? (summe / kp) * 100 : 0,
     gesamt: Math.max(0, kp + summe - eigenprovision),
@@ -443,6 +491,8 @@ export function neuesObjekt(einstellungen = STANDARD_EINSTELLUNGEN) {
     nebenkosten: {
       grunderwerbsteuer: nkPosition('prozent', einstellungen.grunderwerbsteuer),
       notar: nkPosition('prozent', einstellungen.notarkosten),
+      grundbuch: nkPosition('prozent', einstellungen.grundbuchkosten ?? null),
+      grundschuld: nkPosition('prozent', einstellungen.grundschuldkosten ?? null),
       makler: nkPosition('prozent', einstellungen.maklerProvision),
       weitere: [],                 // {id, bezeichnung, modus, wert}
     },

@@ -670,15 +670,17 @@ function finanzierungenKarte(o, neuZeichnen) {
 
 const NK_MODI = [{ wert: 'prozent', text: '%' }, { wert: 'betrag', text: '€' }];
 
-function nkZeile(o, label, pos, { umbauen, werteNeu, betraege, entfernen, bezeichnungBearbeitbar, sofortSchalter } = {}) {
+function nkZeile(o, label, pos, { umbauen, werteNeu, betraege, entfernen, bezeichnungBearbeitbar, sofortSchalter, basis, unter } = {}) {
   const neuZeichnen = umbauen;
+  // Bezugsgröße der Prozentangabe: Kaufpreis, bei der Grundschuld die Darlehenssumme
+  const bezug = basis || (() => o.kaufpreis || 0);
 
   const nameFeld = bezeichnungBearbeitbar
     ? el('input', {
         type: 'text', value: pos.bezeichnung || '', placeholder: 'Bezeichnung',
         onchange: (e) => aendern(() => { pos.bezeichnung = e.target.value; }),
       })
-    : el('span', { text: label });
+    : el('div', {}, [el('div', { text: label }), unter ? el('div.faint', { text: unter, style: 'font-size:12px' }) : null]);
   /* Geldbeschaffungskosten (Grundschuld) sind keine Anschaffungskosten,
      sondern Werbungskosten im Kaufjahr. */
   const nameZelle = sofortSchalter ? el('div', {}, [
@@ -695,7 +697,7 @@ function nkZeile(o, label, pos, { umbauen, werteNeu, betraege, entfernen, bezeic
   const betragZelle = el('td.num', { style: 'width:130px;color:var(--text-dim)' });
   const betragNeu = () => {
     betragZelle.textContent = eur(pos.wert == null ? 0
-      : (pos.modus === 'betrag' ? pos.wert : (o.kaufpreis || 0) * pos.wert / 100));
+      : (pos.modus === 'betrag' ? pos.wert : bezug() * pos.wert / 100));
   };
   betragNeu();
   if (betraege) betraege.push(betragNeu);
@@ -717,7 +719,7 @@ function nkZeile(o, label, pos, { umbauen, werteNeu, betraege, entfernen, bezeic
          Kaufpreises zieht nur die Betragsspalte nach, die Zeilen selbst
          bleiben stehen. Ein eingefrorener Wert wuerde mit dem alten
          Kaufpreis umrechnen. */
-      const kp = o.kaufpreis || 0;
+      const kp = bezug();
       aendern(() => {
         // Wert sinnvoll umrechnen, damit der Euro-Betrag gleich bleibt
         if (pos.wert != null && kp) {
@@ -893,6 +895,13 @@ function aufteilungBlock(o, geaendert) {
 function kaufKarte(o, umbauen, obenNeu) {
   const nk = o.nebenkosten;
   const aufteilung = aufteilungBlock(o, obenNeu);
+  /* Aus Schema 15 übernommen: ein Notar-Wert, der vermutlich Notar und
+     Grundbuch zusammen enthält, vielleicht auch die Grundschuld. */
+  const altNotarHinweis = nk.notar?.wert != null && nk.grundbuch?.wert == null && nk.grundschuld?.wert == null
+    ? hinweis('<strong>Notarkosten aufteilen:</strong> Der Wert bei „Notar Kaufvertrag“ stammt aus der früheren Erfassung '
+      + '„Notar & Grundbuch“ und enthält vermutlich auch das Grundbuch, vielleicht die Grundschuld. Teile ihn anhand der '
+      + 'Rechnungen auf – nur die Grundschuldbestellung ist sofort abziehbar, der Rest läuft über die AfA.', 'info')
+    : null;
 
   /* Beträge und Fußzeile werden nachgezogen, ohne die Karte neu zu bauen */
   const betraege = [];
@@ -918,10 +927,18 @@ function kaufKarte(o, umbauen, obenNeu) {
   const werteNeu = () => { anzeigeNeu(); aufteilung.kaufpreisGeaendert(); obenNeu(); };
 
   const aktionen = { umbauen, werteNeu, betraege };
+  if (!nk.grundbuch) nk.grundbuch = nkPosition('prozent', null);
+  if (!nk.grundschuld) nk.grundschuld = nkPosition('prozent', null);
+  const darlehen = () => nebenkostenBerechnen(o).darlehenssumme;
   const zeilen = [
-    nkZeile(o, 'Grunderwerbsteuer', nk.grunderwerbsteuer, aktionen),
-    nkZeile(o, 'Notar & Grundbuch', nk.notar, aktionen),
-    nkZeile(o, 'Maklerprovision', nk.makler, aktionen),
+    nkZeile(o, 'Grunderwerbsteuer', nk.grunderwerbsteuer, { ...aktionen, unter: 'Anschaffungskosten' }),
+    nkZeile(o, 'Notar Kaufvertrag', nk.notar, { ...aktionen, unter: 'Beurkundung, Vollzug · Anschaffungskosten' }),
+    nkZeile(o, 'Grundbuch Eigentumsumschreibung', nk.grundbuch, { ...aktionen, unter: 'Auflassungsvormerkung, Eintragung · Anschaffungskosten' }),
+    nkZeile(o, 'Grundschuldbestellung', nk.grundschuld, {
+      ...aktionen, basis: darlehen,
+      unter: `Notar & Grundbuch · % von der Darlehenssumme (${eur(darlehen(), 0)}) · sofort abziehbar im Kaufjahr`,
+    }),
+    nkZeile(o, 'Maklerprovision', nk.makler, { ...aktionen, unter: 'Anschaffungskosten' }),
     ...(nk.weitere || []).map((p) => nkZeile(o, p.bezeichnung, p, {
       ...aktionen,
       bezeichnungBearbeitbar: true,
@@ -933,7 +950,7 @@ function kaufKarte(o, umbauen, obenNeu) {
     })),
   ];
 
-  const tabelle = el('table.data.kompakt', {}, [
+  const tabelle = el('table.data.kompakt.liste', {}, [
     el('thead', {}, [el('tr', {}, [
       el('th', { text: 'Position' }), el('th', { text: 'Art' }),
       el('th', { style: 'text-align:right', text: 'Wert' }),
@@ -981,17 +998,11 @@ function kaufKarte(o, umbauen, obenNeu) {
         umbauen();
       },
     }, ['+ Weitere Position']),
-    el('button.btn.btn-sm', {
-      type: 'button', style: 'margin-top:12px;margin-left:8px',
-      title: 'Notar und Grundbuch für die Grundschuld – sofort abziehbare Geldbeschaffungskosten',
-      onclick: () => {
-        aendern(() => { nk.weitere = [...(nk.weitere || []), { ...nkPosition('betrag', null, 'Grundschuld: Notar & Grundbuch'), sofort: true }]; });
-        umbauen();
-      },
-    }, ['+ Grundschuld (Notar & Grundbuch)']),
-    el('div.hint', { style: 'margin-top:8px', text: 'Notar & Grundbuch oben meint Kaufvertrag und Eigentumsumschreibung – das sind Anschaffungskosten. '
-      + 'Die Kosten für die Grundschuld stehen meist getrennt auf der Notarrechnung; als eigene Position mit „sofort abziehbar“ '
-      + 'zählen sie als Werbungskosten im Kaufjahr statt über die AfA.' }),
+    altNotarHinweis,
+    el('div.hint', { style: 'margin-top:8px', text: 'Notar und Grundbuch für Kaufvertrag und Eigentum sind Anschaffungskosten und laufen anteilig '
+      + 'über die Gebäude-AfA. Die Grundschuldbestellung finanziert den Kauf und ist als Geldbeschaffungskosten im Kaufjahr '
+      + 'sofort abziehbar; ihr Prozentsatz bezieht sich auf die Darlehenssumme. Notar- und Grundbuchrechnung weisen beides '
+      + 'getrennt aus. Weitere sofort abziehbare Kosten (z. B. Bankgutachten) als eigene Position mit dem Haken anlegen.' }),
     aufteilung.knoten,
   ]);
 }
