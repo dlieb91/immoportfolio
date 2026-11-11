@@ -19,7 +19,7 @@
 import { heuteISO } from './util.js';
 import {
   state, einheitenVon, finanzierungenVon, verkehrswert,
-  aktiveVertraege, aktuelleKondition, besitzMonate, imBestandIm,
+  aktiveVertraege, aktuelleKondition, besitzMonate, imBestandIm, kaltmieteAnteil,
 } from './store.js';
 import {
   tilgungsplan, restschuldZu, ersatzGuthabenZu, ersatzEingezahltBis,
@@ -106,7 +106,7 @@ function projizierteMiete(o, jahr, params, startJahr) {
           : params.mietsteigerung;
         const konditionsJahr = Number(String(kondition.gueltigAb).slice(0, 4));
         const wachstumAb = Math.max(konditionsJahr, startJahr);
-        summe += kondition.kaltmiete * wachstum(satz, jahr - wachstumAb);
+        summe += kondition.kaltmiete * kaltmieteAnteil(mv, stichtag.slice(0, 7)) * wachstum(satz, jahr - wachstumAb);
       }
     }
   }

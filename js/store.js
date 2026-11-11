@@ -794,6 +794,16 @@ export function naechsteAnpassung(mv, stichtag = heuteISO()) {
     .sort((a, b) => String(a.gueltigAb).localeCompare(String(b.gueltigAb)))[0] || null;
 }
 
+/**
+ * Anteil der Kaltmiete im Monat `periode` ('JJJJ-MM'): Beginnt der Vertrag
+ * am 15. dieses Monats, ist die halbe Kaltmiete fällig, sonst die volle.
+ * Die Vorauszahlung bleibt voll. Gilt nur für die Monatsrechnung (Zahlungen,
+ * Forecast), nicht für die Anzeige der vereinbarten Miete.
+ */
+export function kaltmieteAnteil(mv, periode) {
+  return mv?.beginn && mv.beginn.slice(0, 7) === periode && mv.beginn.slice(8, 10) === '15' ? 0.5 : 1;
+}
+
 /** Kaltmiete und Nebenkosten eines Vertrags zum Stichtag – 0, wenn nicht aktiv. */
 export function mieteVon(mv, stichtag = heuteISO()) {
   if (vertragStatus(mv, stichtag) !== 'aktiv') return { kalt: 0, nk: 0, warm: 0 };

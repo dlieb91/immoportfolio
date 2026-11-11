@@ -21,7 +21,7 @@ import { uid, heuteISO } from './util.js';
 import { monatsSummen } from './betriebskosten.js';
 import {
   state, einheitenVon, finanzierungenVon, aktiveVertraege, mieteVon,
-  objekt as objektMit, einheitMit, einheitName, besitzMonate, darlehenPlan, imBestandIm,
+  objekt as objektMit, einheitMit, einheitName, besitzMonate, darlehenPlan, imBestandIm, kaltmieteAnteil,
   datenRevision,
 } from './store.js';
 
@@ -191,7 +191,8 @@ export function monatszahlungen(o, jahr, monat) {
     for (const mv of aktiveVertraege(e.id, stichtag)) {
       const m = mieteVon(mv, stichtag);
       const name = (einheitenVon(o.id).length > 1 ? einheitName(e) + ' · ' : '') + (mv.mieter || 'Ohne Mieter');
-      zeile('miete', mv.id, name, m.kalt);
+      // Einzug am 15.: halbe Kaltmiete im ersten Monat
+      zeile('miete', mv.id, name, m.kalt * kaltmieteAnteil(mv, p));
       if (m.nk) zeile('nebenkosten', mv.id, name, m.nk);
     }
   }

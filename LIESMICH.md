@@ -303,6 +303,7 @@ werden bewusst nicht verglichen; die laufen auf zwei Geräten ohnehin auseinande
 | 33 | Kaufnebenkosten: bezahlt mit Zahldatum, sofort abziehbare Positionen im Jahr der Zahlung | fertig |
 | 34 | Miete erst ab Kaufmonat; aktivierte Modernisierung erst ab dem Jahr der Maßnahme abgeschrieben | fertig |
 | 35 | Notarielle Beurkundung getrennt vom Übergang von Nutzen und Lasten; Spekulationsfrist ab Beurkundung | fertig |
+| 36 | Mietbeginn am 15.: halbe Kaltmiete im ersten Monat | fertig |
 
 ## Aufbau des Codes
 
@@ -627,7 +628,9 @@ Tilgung …) und frei erfasste Buchungen und Fahrten in einer Tabelle, filterbar
 Objekt, Wohnung, Kategorie und Herkunft.
 
 Abgeleitete Zeilen entstehen wie bisher aus Mietverträgen, Kostenfeldern und Tilgungsplänen
-– Miete und Vorauszahlung erst **ab dem Kaufmonat**: Ein übernommener Vertrag, der lange vor
+– Miete und Vorauszahlung erst **ab dem Kaufmonat**. Ein Monat zählt, wenn der Vertrag am
+15. läuft, dann mit der vollen Miete; nur wenn ein Vertrag **am 15. beginnt**, ist in diesem
+ersten Monat die **halbe Kaltmiete** angesetzt (die Vorauszahlung voll). Zum Kaufmonat: Ein übernommener Vertrag, der lange vor
 dem Kauf begann, bringt davor keine Einnahmen (die standen dem Verkäufer zu). Sie lassen sich **einzeln korrigieren**: anderer Betrag eintragen oder mit ∅ als ausgefallen
 markieren. Gespeichert wird nur die Abweichung, nie die ganze Zahlungsreihe. Korrekturen
 fließen in Cashflow, Steuer, kumulierte Summen und das Dashboard des betroffenen Jahres ein.
