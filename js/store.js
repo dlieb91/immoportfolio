@@ -403,7 +403,11 @@ export function laden(daten) {
 
 /* ---------- Kaufnebenkosten (je Objekt) ---------- */
 
-/** modus: 'prozent' (vom Kaufpreis) oder 'betrag' (fester Euro-Betrag) */
+/**
+ * modus: 'prozent' (vom Kaufpreis) oder 'betrag' (fester Euro-Betrag).
+ * Optional `bezahlt` (Haken) und `bezahltAm` (ISO-Datum): Das Zahldatum legt
+ * fest, in welchem Jahr eine sofort abziehbare Position zählt (§ 11 EStG).
+ */
 export function nkPosition(modus = 'prozent', wert = null, bezeichnung = '') {
   const p = { modus, wert };
   if (bezeichnung) { p.id = uid('nk'); p.bezeichnung = bezeichnung; }
@@ -447,11 +451,22 @@ export function nebenkostenBerechnen(obj) {
      die Grundschuldbestellung und frei angelegte Positionen mit dem Haken
      „sofort abziehbar“ (Geldbeschaffungskosten). Sie gehören zur
      Gesamtinvestition, nicht zu den Anschaffungskosten. */
+  const zahlung = (pos) => (pos?.bezahlt && pos.bezahltAm ? pos.bezahltAm : null);
   const sofortPosten = [
-    ...(posten.grundschuld ? [{ text: 'Grundschuldbestellung (Notar & Grundbuch)', betrag: posten.grundschuld }] : []),
-    ...weitere.filter((p) => p.sofort && p.betrag).map((p) => ({ text: p.bezeichnung || 'Kaufnebenkosten', betrag: p.betrag })),
+    ...(posten.grundschuld ? [{ text: 'Grundschuldbestellung (Notar & Grundbuch)', betrag: posten.grundschuld, bezahltAm: zahlung(nk.grundschuld) }] : []),
+    ...weitere.filter((p) => p.sofort && p.betrag).map((p) => ({ text: p.bezeichnung || 'Kaufnebenkosten', betrag: p.betrag, bezahltAm: zahlung(p) })),
   ];
   const sofort = sofortPosten.reduce((s, p) => s + p.betrag, 0);
+  /* Noch nicht als bezahlt markiert – nur Positionen mit einem Betrag. */
+  const offenPosten = [
+    ['Grunderwerbsteuer', nk.grunderwerbsteuer, posten.grunderwerbsteuer],
+    ['Notar Kaufvertrag', nk.notar, posten.notar],
+    ['Grundbuch Eigentumsumschreibung', nk.grundbuch, posten.grundbuch],
+    ['Grundschuldbestellung', nk.grundschuld, posten.grundschuld],
+    ['Maklerprovision', nk.makler, posten.makler],
+    ...weitere.map((p) => [p.bezeichnung || 'Weitere Position', p, p.betrag]),
+  ].filter(([, pos, betrag]) => betrag > 0 && !pos?.bezahlt).map(([text, , betrag]) => ({ text, betrag }));
+  const offen = offenPosten.reduce((s, p) => s + p.betrag, 0);
   const eigenprovision = obj.eigenprovision || 0;
   return {
     ...posten,
@@ -459,6 +474,8 @@ export function nebenkostenBerechnen(obj) {
     summe,
     sofort,
     sofortPosten,
+    offen,
+    offenPosten,
     darlehenssumme,
     eigenprovision,
     quote: kp ? (summe / kp) * 100 : 0,

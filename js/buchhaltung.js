@@ -23,7 +23,7 @@ import { heuteISO, datumPlus } from './util.js';
 import {
   state, objekt as objektMit, einheitMit, einheitName, objektVonEinheit,
   flaecheVon, einheitenVon, mieteEinheit, buchungenVon, fahrtenVon,
-  besitzMonate, aktiveVertraege, mieteVon, nebenkostenBerechnen,
+  besitzMonate, aktiveVertraege, mieteVon,
 } from './store.js';
 import { kostenJahr } from './betriebskosten.js';
 import {
@@ -31,7 +31,7 @@ import {
 } from './zahlungen.js';
 import {
   afaWerte, afaImJahr, anschaffungsnahePruefung, gebaeudeAnschaffung, erhaltungSteuerlich,
-  afaGebaeudeImJahr, afaInventarImJahr, sofortAbziehbar,
+  afaGebaeudeImJahr, afaInventarImJahr, sofortAbziehbar, sofortAbziehbarePosten, sofortDatum,
 } from './kennzahlen.js';
 
 /* Anlage-V-Zeilen für die beiden neuen Positionen */
@@ -430,10 +430,14 @@ export function werbungskostenHerleitung(o, jahr) {
     });
   }
 
-  /* --- Geldbeschaffungskosten des Kaufs: sofort im Kaufjahr --- */
-  if (sofortAbziehbar(o, jahr)) {
-    const posten = nebenkostenBerechnen(o).sofortPosten
-      .map((p) => ({ ...p, datum: o.kaufdatum, hinweis: 'sofort abziehbar, kein Teil der Anschaffungskosten' }));
+  /* --- Geldbeschaffungskosten des Kaufs: sofort im Jahr der Zahlung --- */
+  const geldbeschaffung = sofortAbziehbarePosten(o, jahr);
+  if (geldbeschaffung.length) {
+    const posten = geldbeschaffung.map((p) => ({
+      text: p.text, betrag: p.betrag, datum: sofortDatum(o, p),
+      hinweis: p.bezahltAm ? 'bezahlt · sofort abziehbar, kein Teil der Anschaffungskosten'
+        : 'ohne Zahldatum im Kaufjahr · sofort abziehbar, kein Teil der Anschaffungskosten',
+    }));
     raus.push({
       label: LABEL_GELDBESCHAFFUNG, art: 'geldbeschaffung', posten,
       betrag: -posten.reduce((s, x) => s + x.betrag, 0),

@@ -300,6 +300,7 @@ werden bewusst nicht verglichen; die laufen auf zwei Geräten ohnehin auseinande
 | 30 | Anschaffungskosten: Grundschuld sofort abziehbar, Inventar mit eigener AfA, Rücklagenanteil ohne AfA | fertig |
 | 31 | Eigenprovision mindert den steuerlichen Kaufpreis, nicht die Kaufnebenkosten | fertig |
 | 32 | Notarkosten in Einzelpositionen, Grundschuldbestellung nach Darlehenssumme sofort abziehbar | fertig |
+| 33 | Kaufnebenkosten: bezahlt mit Zahldatum, sofort abziehbare Positionen im Jahr der Zahlung | fertig |
 
 ## Aufbau des Codes
 
@@ -532,7 +533,7 @@ Was wohin gehört (H 7.3 EStH, § 9 und § 11 EStG):
 | Grundstücksanteil + anteilige Nebenkosten | keine AfA | Zeile Grundstück |
 | Mitgekauftes Inventar, z. B. Einbauküche, im Vertrag gesondert ausgewiesen | eigene AfA, üblich 10 Jahre (BFH IX R 14/15) | Zeile Inventar, Nutzungsdauer wählbar |
 | Übernommener Anteil an der Erhaltungsrücklage | keine Anschaffungskosten, keine AfA | Zeile Anteil Erhaltungsrücklage |
-| Notar und Grundbuch für die **Grundschuld** (Finanzierung) | sofort abziehbare Werbungskosten im Kaufjahr | Position *Grundschuldbestellung*, in % von der Darlehenssumme oder als Betrag |
+| Notar und Grundbuch für die **Grundschuld** (Finanzierung) | sofort abziehbare Werbungskosten im Jahr der Zahlung (ohne Zahldatum: Kaufjahr) | Position *Grundschuldbestellung*, in % von der Darlehenssumme oder als Betrag |
 | Weitere Finanzierungskosten des Kaufs, z. B. Bankgutachten | sofort abziehbar | eigene Position mit Haken *sofort abziehbar* |
 
 Eine **Eigenprovision** (Provision, die du als Käufer vom Vermittler zurückerhältst) mindert
@@ -548,11 +549,18 @@ dieser Wert steht nach dem Update unverändert bei *Notar Kaufvertrag*, und die 
 Aufteilung nach den Rechnungen. Die Vorbelegung für neue Portfolios (1,0 % / 0,5 % / 0,4 %) sind
 Erfahrungswerte; bestehende Portfolios bekommen für Grundbuch und Grundschuld keine Vorgabe.
 
+**Bezahlt.** Jede Position hat einen Haken *bezahlt* mit Zahldatum; die Fußzeile zeigt, was
+noch offen ist. Für die Anschaffungskosten und die AfA spielt das Datum keine Rolle – die AfA
+beginnt mit dem Kauf. Sofort abziehbare Positionen (Grundschuldbestellung, Haken *sofort
+abziehbar*) zählen dagegen im **Jahr der Zahlung** (§ 11 EStG): Wird die Notarrechnung für einen
+Kauf im Dezember erst im Januar bezahlt, stehen die Geldbeschaffungskosten im Folgejahr. Ohne
+Haken oder ohne Datum gilt wie bisher das Kaufjahr.
+
 Die Nebenkosten werden im Verhältnis der Kaufpreisanteile auf Gebäude, Grundstück und
 Inventar verteilt; der Rücklagenanteil bekommt keinen Anteil. Das ist eine Vereinfachung: Auf
 Inventar fällt streng genommen keine Grunderwerbsteuer an. Sofort abziehbare Positionen zählen
 zur Gesamtinvestition und zum Eigenkapital, aber nicht zu den Anschaffungskosten; in der Anlage V
-stehen sie im Kaufjahr als *Geldbeschaffungskosten*, die Inventar-AfA als *AfA bewegliche
+stehen sie im Jahr der Zahlung als *Geldbeschaffungskosten*, die Inventar-AfA als *AfA bewegliche
 Wirtschaftsgüter*. Die Excel-Mappe kennt Inventar, Rücklagenanteil, Grundbuch- und Grundschuldposition und sofort abziehbare
 Positionen nicht.
 Im Anschaffungsjahr wird die AfA ab dem Kaufmonat zeitanteilig angesetzt. Der AfA-Satz ist

@@ -125,13 +125,30 @@ export function anschaffungsAufteilung(o) {
 }
 
 /**
- * Sofort abziehbare Kaufnebenkosten – Werbungskosten im Jahr des Kaufs
- * (Abfluss, § 11 EStG), etwa Notar und Grundbuch für die Grundschuld.
+ * Datum, an dem eine sofort abziehbare Position zählt: das Zahldatum, wenn
+ * sie als bezahlt markiert ist, sonst – wie früher – das Kaufdatum.
  */
-export function sofortAbziehbar(o, jahr) {
-  const kaufjahr = o?.kaufdatum ? Number(o.kaufdatum.slice(0, 4)) : null;
-  if (kaufjahr !== jahr) return 0;
-  return nebenkostenBerechnen(o).sofort;
+export function sofortDatum(o, posten) {
+  return posten.bezahltAm || o?.kaufdatum || null;
+}
+
+/**
+ * Sofort abziehbare Kaufnebenkosten – Werbungskosten im Jahr der Zahlung
+ * (Abfluss, § 11 EStG), etwa Notar und Grundbuch für die Grundschuld. Ohne
+ * Zahldatum gilt das Kaufjahr. `bisMonat` begrenzt auf Zahlungen bis zu
+ * diesem Monat (für Rückblicke bis heute).
+ */
+export function sofortAbziehbarePosten(o, jahr, bisMonat = 12) {
+  return nebenkostenBerechnen(o).sofortPosten.filter((p) => {
+    const d = sofortDatum(o, p);
+    if (!d || Number(d.slice(0, 4)) !== jahr) return false;
+    // Ohne Zahldatum zählt der Kauf selbst – der liegt im Besitzzeitraum
+    return !p.bezahltAm || Number(d.slice(5, 7)) <= bisMonat;
+  });
+}
+
+export function sofortAbziehbar(o, jahr, bisMonat = 12) {
+  return sofortAbziehbarePosten(o, jahr, bisMonat).reduce((s, p) => s + p.betrag, 0);
 }
 
 export function grundstuecksquote(o) {
@@ -657,7 +674,7 @@ export function kapitalbindung(o, stichtag = heuteISO()) {
       - ist.betriebskostenUmlagefaehig - ist.zins
       // wie oben: steuerlicher Erhaltungsaufwand, nicht der gezahlte
       - (erhaltungSteuerlich(o.id, j) + ist.fahrtkosten + ist.sonstigeWkGesamt)
-      - (besitzMonateBis(o, j, grenze) ? sofortAbziehbar(o, j) : 0)
+      - (besitzMonateBis(o, j, grenze) ? sofortAbziehbar(o, j, grenze) : 0)
       - afaImJahr(o, j, grenze);
     vor += cfVor;
     /* Getrennt gefuehrt, nicht eingerechnet: Eine Erstattung auf Verluste

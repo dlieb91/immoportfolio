@@ -217,7 +217,7 @@ export function prognose(params, stichtag = heuteISO(), objektIds = null) {
       /* Die Instandhaltungsrücklage mindert den Cashflow, aber nicht die
          Einkünfte – abziehbar wird sie erst bei Verausgabung durch die
          Gemeinschaft (BFH IX R 19/24). Siehe kennzahlen.js. */
-      // Geldbeschaffungskosten des Kaufs: einmalig im Kaufjahr
+      // Geldbeschaffungskosten des Kaufs: einmalig im Jahr der Zahlung
       const einkuenfte = miete - bewirtschaftung - zins - afa - sofortAbziehbar(o, jahr);
       const steuer = einkuenfte * steuersatzFuer(o, params) / 100;
 

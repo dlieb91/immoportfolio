@@ -12,7 +12,7 @@ import { bildURL, bildSpeichern, bildLoeschen } from '../storage.js';
 import {
   textFeld, zahlFeld, zahlEingabe, datumFeld, auswahlFeld, schalterFeld, textBereich,
   anzeigeFeld, felderGitter, abschnitt, parseZahl,
-  tabellenDatum, tabellenZahl, tabellenText, tabellenAuswahl, hinweis,
+  tabellenDatum, tabellenZahl, tabellenText, tabellenAuswahl, hinweis, plausiblesDatum,
 } from '../felder.js';
 import {
   KOSTENARTEN, RHYTHMEN, kostenart, artVorgabe, neuePosition, jahresbetrag, kostenJahr,
@@ -682,7 +682,7 @@ function nkZeile(o, label, pos, { umbauen, werteNeu, betraege, entfernen, bezeic
       })
     : el('div', {}, [el('div', { text: label }), unter ? el('div.faint', { text: unter, style: 'font-size:12px' }) : null]);
   /* Geldbeschaffungskosten (Grundschuld) sind keine Anschaffungskosten,
-     sondern Werbungskosten im Kaufjahr. */
+     sondern Werbungskosten im Jahr der Zahlung. */
   const nameZelle = sofortSchalter ? el('div', {}, [
     nameFeld,
     el('label', {
@@ -733,11 +733,48 @@ function nkZeile(o, label, pos, { umbauen, werteNeu, betraege, entfernen, bezeic
     },
   })));
 
+  /* Bezahlt: Haken und Zahldatum. Das Datum ist erst sichtbar, wenn der
+     Haken sitzt; ohne Haken zählt ein gespeichertes Datum nicht. */
+  const datumInput = el('input', {
+    type: 'date', value: pos.bezahltAm || '', style: 'width:160px',
+    title: 'Zahldatum',
+    onchange: (e) => {
+      const wert = e.target.value || null;
+      if (wert && !plausiblesDatum(wert)) return;
+      aendern(() => { pos.bezahltAm = wert; });
+      werteNeu();
+    },
+  });
+  const datumHuelle = el('div', { style: pos.bezahlt ? '' : 'display:none' }, [datumInput]);
+  const bezahltZelle = el('td', { style: 'width:270px' }, [
+    el('div', { style: 'display:flex;gap:8px;align-items:center;justify-content:flex-end;flex-wrap:wrap' }, [
+      el('label', { style: 'display:flex;gap:6px;align-items:center;cursor:pointer;white-space:nowrap' }, [
+        el('input', {
+          type: 'checkbox', checked: !!pos.bezahlt,
+          onchange: (e) => {
+            const an = e.target.checked;
+            aendern(() => {
+              if (an) pos.bezahlt = true;
+              else { delete pos.bezahlt; delete pos.bezahltAm; }
+            });
+            if (!an) datumInput.value = '';
+            datumHuelle.style.display = an ? '' : 'none';
+            if (an) datumInput.focus();
+            werteNeu();
+          },
+        }),
+        'bezahlt',
+      ]),
+      datumHuelle,
+    ]),
+  ]);
+
   return el('tr', {}, [
     el('td', {}, [nameZelle]),
     el('td', { style: 'width:96px' }, [modus]),
     el('td', { style: 'width:130px' }, [wertInput]),
     betragZelle,
+    bezahltZelle,
     el('td', { style: 'width:40px' }, [
       entfernen
         ? el('button.icon-mini', { type: 'button', title: 'Position entfernen', onclick: entfernen, html: '&times;' })
@@ -808,7 +845,7 @@ function aufteilungBlock(o, geaendert) {
       ? 'In den steuerlichen Angaben ist eine AfA-Bemessungsgrundlage von Hand gesetzt – für die AfA gilt diese, nicht diese Aufteilung.'
       : (o.grundstueckBetrag != null && kp && o.grundstueckBetrag > kp ? 'Der Grundstücksanteil ist größer als der Kaufpreis der Immobilie.' : '');
     sofortZeile.textContent = auf.sofort
-      ? `Nicht enthalten: ${eur(auf.sofort)} sofort abziehbare Kaufnebenkosten (Geldbeschaffung) – Werbungskosten im Kaufjahr.`
+      ? `Nicht enthalten: ${eur(auf.sofort)} sofort abziehbare Kaufnebenkosten (Geldbeschaffung) – Werbungskosten im Jahr der Zahlung.`
       : '';
   };
 
@@ -907,11 +944,12 @@ function kaufKarte(o, umbauen, obenNeu) {
   const betraege = [];
   const quoteZelle = el('td.num.faint');
   const summeZelle = el('td.num', { style: 'font-weight:600' });
+  const offenZelle = el('td.num', { style: 'font-size:12.5px' });
   const eigenprovZeile = el('tr', {}, [
     el('td', { text: '− Eigenprovision' }),
     el('td', {}), el('td', {}),
     el('td.num', { text: '' }),
-    el('td', {}),
+    el('td', {}), el('td', {}),
   ]);
   const eigenprovZelle = eigenprovZeile.children[3];
   const gesamtZelle = el('td.num', { style: 'font-weight:600;color:var(--accent)' });
@@ -923,6 +961,9 @@ function kaufKarte(o, umbauen, obenNeu) {
     eigenprovZeile.style.display = r.eigenprovision ? '' : 'none';
     eigenprovZelle.textContent = '− ' + eur(r.eigenprovision);
     gesamtZelle.textContent = eur(r.gesamt);
+    const mitBetrag = r.summe > 0;
+    offenZelle.textContent = !mitBetrag ? '' : r.offen > 0 ? `offen: ${eur(r.offen)}` : 'alles bezahlt';
+    offenZelle.style.color = r.offen > 0 ? 'var(--warn)' : 'var(--pos)';
   };
   const werteNeu = () => { anzeigeNeu(); aufteilung.kaufpreisGeaendert(); obenNeu(); };
 
@@ -936,7 +977,7 @@ function kaufKarte(o, umbauen, obenNeu) {
     nkZeile(o, 'Grundbuch Eigentumsumschreibung', nk.grundbuch, { ...aktionen, unter: 'Auflassungsvormerkung, Eintragung · Anschaffungskosten' }),
     nkZeile(o, 'Grundschuldbestellung', nk.grundschuld, {
       ...aktionen, basis: darlehen,
-      unter: `Notar & Grundbuch · % von der Darlehenssumme (${eur(darlehen(), 0)}) · sofort abziehbar im Kaufjahr`,
+      unter: `Notar & Grundbuch · % von der Darlehenssumme (${eur(darlehen(), 0)}) · sofort abziehbar im Jahr der Zahlung`,
     }),
     nkZeile(o, 'Maklerprovision', nk.makler, { ...aktionen, unter: 'Anschaffungskosten' }),
     ...(nk.weitere || []).map((p) => nkZeile(o, p.bezeichnung, p, {
@@ -955,18 +996,19 @@ function kaufKarte(o, umbauen, obenNeu) {
       el('th', { text: 'Position' }), el('th', { text: 'Art' }),
       el('th', { style: 'text-align:right', text: 'Wert' }),
       el('th', { style: 'text-align:right', text: 'Betrag' }),
+      el('th', { style: 'text-align:right', text: 'Bezahlt' }),
       el('th', {}),
     ])]),
     el('tbody', {}, zeilen),
     el('tfoot', {}, [
       el('tr', {}, [
         el('td', { text: 'Kaufnebenkosten gesamt', style: 'font-weight:600' }),
-        el('td', {}), quoteZelle, summeZelle, el('td', {}),
+        el('td', {}), quoteZelle, summeZelle, offenZelle, el('td', {}),
       ]),
       eigenprovZeile,
       el('tr', {}, [
         el('td', { text: 'Gesamtinvestition', style: 'font-weight:600' }),
-        el('td', {}), el('td', {}), gesamtZelle, el('td', {}),
+        el('td', {}), el('td', {}), gesamtZelle, el('td', {}), el('td', {}),
       ]),
     ]),
   ]);
@@ -1000,8 +1042,8 @@ function kaufKarte(o, umbauen, obenNeu) {
     }, ['+ Weitere Position']),
     altNotarHinweis,
     el('div.hint', { style: 'margin-top:8px', text: 'Notar und Grundbuch für Kaufvertrag und Eigentum sind Anschaffungskosten und laufen anteilig '
-      + 'über die Gebäude-AfA. Die Grundschuldbestellung finanziert den Kauf und ist als Geldbeschaffungskosten im Kaufjahr '
-      + 'sofort abziehbar; ihr Prozentsatz bezieht sich auf die Darlehenssumme. Notar- und Grundbuchrechnung weisen beides '
+      + 'über die Gebäude-AfA. Die Grundschuldbestellung finanziert den Kauf und ist als Geldbeschaffungskosten '
+      + 'sofort abziehbar – im Jahr der Zahlung, ohne Zahldatum im Kaufjahr; ihr Prozentsatz bezieht sich auf die Darlehenssumme. Notar- und Grundbuchrechnung weisen beides '
       + 'getrennt aus. Weitere sofort abziehbare Kosten (z. B. Bankgutachten) als eigene Position mit dem Haken anlegen.' }),
     aufteilung.knoten,
   ]);
