@@ -732,6 +732,15 @@ export function besitzMonate(o, jahr) {
   return 13 - kaufmonat;
 }
 
+/**
+ * Gehört das Objekt im Monat `periode` ('JJJJ-MM') schon zum Bestand?
+ * Der Kaufmonat zählt voll – wie bei den Kosten und der AfA. Ein vor dem
+ * Kauf begonnener, übernommener Mietvertrag bringt erst ab hier Miete.
+ */
+export function imBestandIm(o, periode) {
+  return !o?.kaufdatum || periode >= o.kaufdatum.slice(0, 7);
+}
+
 /* ---------- Tilgungsplaene mit Zwischenspeicher ---------- */
 
 let planRevision = -1;

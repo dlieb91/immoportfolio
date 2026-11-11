@@ -21,7 +21,7 @@ import { uid, heuteISO } from './util.js';
 import { monatsSummen } from './betriebskosten.js';
 import {
   state, einheitenVon, finanzierungenVon, aktiveVertraege, mieteVon,
-  objekt as objektMit, einheitMit, einheitName, besitzMonate, darlehenPlan,
+  objekt as objektMit, einheitMit, einheitName, besitzMonate, darlehenPlan, imBestandIm,
   datenRevision,
 } from './store.js';
 
@@ -166,8 +166,7 @@ export function monatszahlungen(o, jahr, monat) {
   const stichtag = `${p}-15`;
   const geplant = p > laufenderMonat();
   const raus = [];
-  const imBestand = besitzMonate(o, jahr) > 0
-    && (!o.kaufdatum || p >= o.kaufdatum.slice(0, 7));
+  const imBestand = besitzMonate(o, jahr) > 0 && imBestandIm(o, p);
 
   const zeile = (art, bezugId, bezugText, standard) => {
     const korr = korrekturFinden(p, art, bezugId);
@@ -185,8 +184,10 @@ export function monatszahlungen(o, jahr, monat) {
     });
   };
 
-  /* Miete und Nebenkosten je laufendem Vertrag */
-  for (const e of einheitenVon(o.id)) {
+  /* Miete und Nebenkosten je laufendem Vertrag – erst ab dem Kaufmonat.
+     Ein übernommener Vertrag beginnt oft Jahre vor dem Kauf; die Miete
+     davor stand dem Verkäufer zu, nicht dir. */
+  for (const e of imBestand ? einheitenVon(o.id) : []) {
     for (const mv of aktiveVertraege(e.id, stichtag)) {
       const m = mieteVon(mv, stichtag);
       const name = (einheitenVon(o.id).length > 1 ? einheitName(e) + ' · ' : '') + (mv.mieter || 'Ohne Mieter');

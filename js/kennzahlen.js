@@ -350,8 +350,69 @@ export function afaImJahr(o, jahr, bisMonat = 12) {
 
 /** Gebäude-AfA eines Jahres (§ 7 Abs. 4 EStG). */
 export function afaGebaeudeImJahr(o, jahr, bisMonat = 12) {
+  return afaGebaeudeStand(o, jahr, bisMonat).betrag;
+}
+
+/**
+ * Aktivierte Maßnahmen mit dem Jahr, ab dem sie abgeschrieben werden: das
+ * Jahr der Maßnahme, frühestens das Kaufjahr.
+ */
+function aktivierteMitJahr(o) {
+  const kaufjahr = o.kaufdatum ? Number(o.kaufdatum.slice(0, 4)) : null;
+  return anschaffungsnahePruefung(o).massnahmen
+    .filter((x) => x.aktiviert && x.betrag)
+    .map((x) => {
+      const j = Number(String(x.datum || '').slice(0, 4)) || kaufjahr;
+      return { betrag: x.betrag, abJahr: kaufjahr != null && j != null ? Math.max(j, kaufjahr) : j };
+    });
+}
+
+/**
+ * Gebäude-AfA eines Jahres, aufgeschlüsselt.
+ *
+ * Nachträgliche Herstellungskosten – aktivierte Modernisierung, auch
+ * anschaffungsnahe nach § 6 Abs. 1 Nr. 1a EStG – erhöhen die Bemessungs-
+ * grundlage erst ab dem Jahr, in dem sie anfallen, dann aber mit dem vollen
+ * Jahresbetrag, als wären sie zu Jahresbeginn aufgewendet (R 7.4 Abs. 9
+ * EStR). Frühere Jahre bleiben unberührt. Im Kaufjahr gilt für alles die
+ * Zeitanteiligkeit ab dem Kaufmonat.
+ *
+ * Vereinfachung: Jede Maßnahme läuft mit dem AfA-Satz des Gebäudes über
+ * dieselbe Dauer ab ihrem Jahr. In Summe wird so die erhöhte
+ * Bemessungsgrundlage abgeschrieben.
+ */
+export function afaGebaeudeStand(o, jahr, bisMonat = 12) {
   const a = afaWerte(o);
-  return afaLinear(o, jahr, bisMonat, a.afaJahr, a.afaDauer);
+  const satz = (o.afaSatz ?? 0) / 100;
+  const dauer = a.afaDauer;
+  const kaufjahr = o.kaufdatum ? Number(o.kaufdatum.slice(0, 4)) : null;
+  const monate = besitzMonateBis(o, jahr, bisMonat);
+  const laeuft = (abJahr) => !!dauer && (abJahr == null || (jahr >= abJahr && jahr < abJahr + dauer));
+
+  let basis = 0, modernisierung = 0;
+  const grund = a.gebaeude - a.modernisierung;
+  if (grund > 0 && laeuft(kaufjahr)) basis += grund;
+  for (const m of aktivierteMitJahr(o)) {
+    if (!laeuft(m.abJahr)) continue;
+    basis += m.betrag;
+    modernisierung += m.betrag;
+  }
+  const afaVoll = basis * satz;
+  return { betrag: afaVoll * monate / 12, basis, modernisierung, afaVoll, monate };
+}
+
+/**
+ * Volle Jahres-AfA des Gebäudes nach dem Stand im Jahr `jahr` – ohne
+ * Maßnahmen, die erst später kommen. Für die Kennzahlen der laufenden zwölf
+ * Monate.
+ */
+export function afaGebaeudeVoll(o, jahr) {
+  const a = afaWerte(o);
+  const satz = (o.afaSatz ?? 0) / 100;
+  const spaeter = aktivierteMitJahr(o).filter((m) => m.abJahr != null && m.abJahr > jahr)
+    .reduce((s, m) => s + m.betrag, 0);
+  const basis = a.gebaeude - spaeter;
+  return { basis, afaVoll: basis * satz };
 }
 
 /** AfA des mitgekauften Inventars (§ 7 Abs. 1 EStG), eigene Nutzungsdauer. */
@@ -508,8 +569,9 @@ export function objektKennzahlen(o, stichtag = heuteISO()) {
   const kaltmieteRunrate = mieteVereinbart.kalt * 12;
   const cashflowRunrate = kaltmieteRunrate - bewirtschaftungVoll - kapitaldienst12;
   // Auch hier ohne die Ruecklage – siehe werbungskosten oben (BFH IX R 19/24).
+  const afaStand = afaGebaeudeVoll(o, jahr);
   const einkuenfteRunrate = kaltmieteRunrate - (bewirtschaftungVoll - instandhaltungVoll)
-    - zins12 - afa.afaJahr;
+    - zins12 - afaStand.afaVoll;
   const steuerRunrate = einkuenfteRunrate * steuersatz / 100;
   const cashflowRunrateNachSteuer = cashflowRunrate - steuerRunrate;
 
@@ -577,7 +639,7 @@ export function objektKennzahlen(o, stichtag = heuteISO()) {
     // laufende zwölf Monate
     cashflowRunrate, cashflowRunrateNachSteuer, einkuenfteRunrate, steuerRunrate,
     // Steuer
-    afaJahr, afaVoll: afa.afaJahr, afaBemessung: afa.gebaeude, afaGrundstueck: afa.grundstueck,
+    afaJahr, afaVoll: afaStand.afaVoll, afaBemessung: afaStand.basis, afaGrundstueck: afa.grundstueck,
     werbungskosten, einkuenfte, steuersatz, steuer,
     // Ergebnis
     cashflowVorSteuer, cashflowNachSteuer,

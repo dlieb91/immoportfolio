@@ -290,7 +290,8 @@ function herleitungsKarte(o, jahr) {
       const r = pos.rechnung;
       zeilen.push(zeile('Anschaffungskosten Gebäude und Grundstück', 'Kaufpreis inkl. aktivierungspflichtiger Nebenkosten', r.anschaffung));
       zeilen.push(zeile('abzüglich Grundstücksanteil', null, -r.grundstueck));
-      if (r.modernisierung) zeilen.push(zeile('zuzüglich aktivierte Modernisierung', null, r.modernisierung));
+      if (r.modernisierung) zeilen.push(zeile('zuzüglich aktivierte Modernisierung',
+        'ab dem Jahr der Maßnahme mit vollem Jahresbetrag (R 7.4 Abs. 9 EStR)', r.modernisierung));
       zeilen.push(zeile('AfA-Bemessungsgrundlage', null, r.gebaeude, true));
       zeilen.push(zeile(`Abschreibung ${num(r.satz, 3)} % pro Jahr`,
         r.dauer ? `über ${num(r.dauer, 1)} Jahre` : null, r.afaVoll));

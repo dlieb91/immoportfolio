@@ -1081,7 +1081,7 @@ function steuerKarte(o, obenNeu) {
       : `${num(grundstuecksquote(o), 2)} % der Anschaffungskosten`;
     bemessung.wert.textContent = eur(a.gebaeude);
     bemessung.hint.textContent = [manuell ? 'manueller Gebäudeanteil' : 'Gebäude + Nebenkosten',
-      a.modernisierung ? 'inkl. aktivierter Modernisierung' : null].filter(Boolean).join(' ');
+      a.modernisierung ? 'inkl. aktivierter Modernisierung – sie wirkt erst ab dem Jahr der Maßnahme' : null].filter(Boolean).join(' ');
     proJahr.wert.textContent = eur(a.afaJahr + a.inventarAfaJahr);
     proJahr.hint.textContent = (a.afaDauer
       ? `Gebäude über ${num(a.afaDauer, 1)} Jahre ab ${datum(o.kaufdatum)}`

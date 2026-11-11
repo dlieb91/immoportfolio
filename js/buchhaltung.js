@@ -23,7 +23,7 @@ import { heuteISO, datumPlus } from './util.js';
 import {
   state, objekt as objektMit, einheitMit, einheitName, objektVonEinheit,
   flaecheVon, einheitenVon, mieteEinheit, buchungenVon, fahrtenVon,
-  besitzMonate, aktiveVertraege, mieteVon,
+  besitzMonate, aktiveVertraege, mieteVon, imBestandIm,
 } from './store.js';
 import { kostenJahr } from './betriebskosten.js';
 import {
@@ -31,7 +31,7 @@ import {
 } from './zahlungen.js';
 import {
   afaWerte, afaImJahr, anschaffungsnahePruefung, gebaeudeAnschaffung, erhaltungSteuerlich,
-  afaGebaeudeImJahr, afaInventarImJahr, sofortAbziehbar, sofortAbziehbarePosten, sofortDatum,
+  afaGebaeudeImJahr, afaGebaeudeStand, afaInventarImJahr, sofortAbziehbar, sofortAbziehbarePosten, sofortDatum,
 } from './kennzahlen.js';
 
 /* Anlage-V-Zeilen für die beiden neuen Positionen */
@@ -143,6 +143,8 @@ export function nkAbrechnung(einheitId, jahr) {
   let vorauszahlung = 0, monateVermietet = 0;
   const vertraege = [];
   for (let m = 1; m <= 12; m++) {
+    // Vor dem Kauf rechnet der Verkäufer ab, nicht du
+    if (!imBestandIm(o, `${jahr}-${String(m).padStart(2, '0')}`)) continue;
     const stichtag = `${jahr}-${String(m).padStart(2, '0')}-15`;
     const w = mieteEinheit(einheitId, stichtag);
     if (w.nk) vorauszahlung += w.nk;
@@ -397,9 +399,10 @@ export function werbungskostenHerleitung(o, jahr) {
 
   /* --- Abschreibung --- */
   const a = afaWerte(o);
-  const afaBetrag = afaGebaeudeImJahr(o, jahr);
+  const stand = afaGebaeudeStand(o, jahr);
+  const afaBetrag = stand.betrag;
   if (afaBetrag) {
-    const monate = a.afaJahr ? Math.round(afaBetrag / a.afaJahr * 12) : 0;
+    const monate = stand.monate;
     raus.push({
       label: 'Werbungskosten: AfA',
       betrag: -afaBetrag,
@@ -407,11 +410,11 @@ export function werbungskostenHerleitung(o, jahr) {
       rechnung: {
         anschaffung: a.anschaffung,
         grundstueck: a.grundstueck,
-        modernisierung: a.modernisierung,
-        gebaeude: a.gebaeude,
+        modernisierung: stand.modernisierung,
+        gebaeude: stand.basis,
         satz: o.afaSatz ?? 0,
         dauer: a.afaDauer,
-        afaVoll: a.afaJahr,
+        afaVoll: stand.afaVoll,
         monate,
         betrag: afaBetrag,
       },

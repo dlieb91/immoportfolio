@@ -301,6 +301,7 @@ werden bewusst nicht verglichen; die laufen auf zwei Geräten ohnehin auseinande
 | 31 | Eigenprovision mindert den steuerlichen Kaufpreis, nicht die Kaufnebenkosten | fertig |
 | 32 | Notarkosten in Einzelpositionen, Grundschuldbestellung nach Darlehenssumme sofort abziehbar | fertig |
 | 33 | Kaufnebenkosten: bezahlt mit Zahldatum, sofort abziehbare Positionen im Jahr der Zahlung | fertig |
+| 34 | Miete erst ab Kaufmonat; aktivierte Modernisierung erst ab dem Jahr der Maßnahme abgeschrieben | fertig |
 
 ## Aufbau des Codes
 
@@ -563,7 +564,11 @@ zur Gesamtinvestition und zum Eigenkapital, aber nicht zu den Anschaffungskosten
 stehen sie im Jahr der Zahlung als *Geldbeschaffungskosten*, die Inventar-AfA als *AfA bewegliche
 Wirtschaftsgüter*. Die Excel-Mappe kennt Inventar, Rücklagenanteil, Grundbuch- und Grundschuldposition und sofort abziehbare
 Positionen nicht.
-Im Anschaffungsjahr wird die AfA ab dem Kaufmonat zeitanteilig angesetzt. Der AfA-Satz ist
+Im Anschaffungsjahr wird die AfA ab dem Kaufmonat zeitanteilig angesetzt. **Aktivierte
+Modernisierung** (auch anschaffungsnahe Herstellungskosten) erhöht die Bemessungsgrundlage erst
+ab dem Jahr der Maßnahme, dann mit dem vollen Jahresbetrag (R 7.4 Abs. 9 EStR); frühere Jahre
+bleiben unverändert. Vereinfacht läuft jede Maßnahme mit dem AfA-Satz des Gebäudes über
+dieselbe Dauer ab ihrem Jahr. Der AfA-Satz ist
 frei eingebbar – für ein Restnutzungsdauer-Gutachten trägst du z. B. 3,226 % ein (31 Jahre).
 
 **Liquidität.** Die erste Karte im Forecast zeigt die **nächsten zwölf Monate**, Monat für
@@ -620,7 +625,8 @@ Tilgung …) und frei erfasste Buchungen und Fahrten in einer Tabelle, filterbar
 Objekt, Wohnung, Kategorie und Herkunft.
 
 Abgeleitete Zeilen entstehen wie bisher aus Mietverträgen, Kostenfeldern und Tilgungsplänen
-und lassen sich **einzeln korrigieren**: anderer Betrag eintragen oder mit ∅ als ausgefallen
+– Miete und Vorauszahlung erst **ab dem Kaufmonat**: Ein übernommener Vertrag, der lange vor
+dem Kauf begann, bringt davor keine Einnahmen (die standen dem Verkäufer zu). Sie lassen sich **einzeln korrigieren**: anderer Betrag eintragen oder mit ∅ als ausgefallen
 markieren. Gespeichert wird nur die Abweichung, nie die ganze Zahlungsreihe. Korrekturen
 fließen in Cashflow, Steuer, kumulierte Summen und das Dashboard des betroffenen Jahres ein.
 Zwei Grenzen: Der **Tilgungsplan** bleibt unberührt – eine gestrichene Tilgungsrate
@@ -781,7 +787,7 @@ ab, die zeigt, woraus jede Position entstanden ist – und zwar aus denselben Qu
 denen die Summen gebildet werden. Beide stimmen deshalb auf den Cent überein.
 
 - **AfA** als Rechenweg: Anschaffungskosten, abzüglich Grundstücksanteil, zuzüglich
-  aktivierter Modernisierung, ergibt die Bemessungsgrundlage; davon der AfA-Satz, im
+  aktivierter Modernisierung ab dem Jahr der Maßnahme, ergibt die Bemessungsgrundlage; davon der AfA-Satz, im
   Anschaffungsjahr zeitanteilig ab dem Kaufmonat.
 - **Erhaltungsaufwand** je Maßnahme mit Datum und, wo verteilt, dem Jahresanteil samt
   Hinweis auf § 82b EStDV – aus beiden Quellen, Buchungen wie Modernisierungen. Darunter

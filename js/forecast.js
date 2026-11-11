@@ -19,7 +19,7 @@
 import { heuteISO } from './util.js';
 import {
   state, einheitenVon, finanzierungenVon, verkehrswert,
-  aktiveVertraege, aktuelleKondition, besitzMonate,
+  aktiveVertraege, aktuelleKondition, besitzMonate, imBestandIm,
 } from './store.js';
 import {
   tilgungsplan, restschuldZu, ersatzGuthabenZu, ersatzEingezahltBis,
@@ -96,6 +96,7 @@ function projizierteMiete(o, jahr, params, startJahr) {
   let summe = 0;
   for (const e of einheitenVon(o.id)) {
     for (let m = 1; m <= 12; m++) {
+      if (!imBestandIm(o, `${jahr}-${String(m).padStart(2, '0')}`)) continue;
       const stichtag = `${jahr}-${String(m).padStart(2, '0')}-15`;
       for (const mv of aktiveVertraege(e.id, stichtag)) {
         const kondition = aktuelleKondition(mv, stichtag);
